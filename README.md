@@ -36,10 +36,8 @@ Dokploy includes multiple features to make your life easier.
 
 To get started, run the following command on a VPS:
 
-Want to skip the installation process? [Try the Dokploy Cloud](https://app.dokploy.com).
-
 ```bash
-curl -sSL https://dokploy.com/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/Rain-kl/dokploy/feat/script/install.sh | bash
 ```
 
 For detailed documentation, visit [docs.dokploy.com](https://docs.dokploy.com).

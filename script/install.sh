@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-# Dokploy 二次开发版本一键安装脚本 (Rain-kl/dokploy)
+# Dokploy 二次开发版本一键安装与更新脚本 (Rain-kl/dokploy)
 # ==============================================================================
 
 DOCKER_VERSION="28.5.0"
@@ -39,7 +39,7 @@ detect_version() {
 generate_random_password() {
     local password=""
     if command -v openssl >/dev/null 2>&1; then
-        password=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-32)
+        password=$(openssl rand -hex 32)
     elif [ -r /dev/urandom ]; then
         password=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32)
     else
@@ -71,18 +71,27 @@ install_dokploy() {
         exit 1
     fi
 
+    # 检查 3000 端口占用
+    if ss -tulnp | grep ':3000 ' >/dev/null 2>&1; then
+        echo "错误: 宿主机 3000 端口已被占用，请先停止占用该端口的服务" >&2
+        exit 1
+    fi
+
     # 安装/检查 Docker
     if ! command -v docker >/dev/null 2>&1; then
         echo "正在安装 Docker..."
-        curl -fsSL https://get.docker.com -o get-docker.sh
-        sh get-docker.sh --version "${DOCKER_VERSION}"
-        rm -f get-docker.sh
+        curl -fsSL https://get.docker.com | sh -s -- --version "${DOCKER_VERSION}"
     fi
 
     # 初始化 Docker Swarm
     if ! docker info --format '{{.Swarm.LocalNodeState}}' | grep -q "active"; then
         echo "初始化 Docker Swarm..."
-        docker swarm init || true
+        PRIMARY_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+        if [ -n "$PRIMARY_IP" ]; then
+            docker swarm init --advertise-addr "$PRIMARY_IP" || docker swarm init || true
+        else
+            docker swarm init || true
+        fi
     fi
 
     # 创建 overlay 网络
@@ -91,32 +100,40 @@ install_dokploy() {
         docker network create --driver overlay --attachable dokploy-network || true
     fi
 
-    # 创建配置路径与秘钥
+    # 创建配置目录与 Docker Secrets 加密存储
     mkdir -p /etc/dokploy
-    if [ ! -f /etc/dokploy/auth_secret ]; then
-        AUTH_SECRET=$(generate_random_password)
-        echo "$AUTH_SECRET" > /etc/dokploy/auth_secret
-        chmod 600 /etc/dokploy/auth_secret
-    fi
+    chmod 777 /etc/dokploy
 
-    # 启动 Redis 容器服务
+    POSTGRES_PASSWORD=$(generate_random_password)
+    echo "$POSTGRES_PASSWORD" | docker secret create dokploy_postgres_password - 2>/dev/null || true
+
+    AUTH_SECRET=$(generate_random_password)
+    echo "$AUTH_SECRET" | docker secret create dokploy_auth_secret - 2>/dev/null || true
+    echo "$AUTH_SECRET" > /etc/dokploy/auth_secret 2>/dev/null || true
+    chmod 600 /etc/dokploy/auth_secret 2>/dev/null || true
+
+    # 启动 Valkey 8 Alpine 容器服务
     if ! docker service ls | grep -q "dokploy-redis"; then
-        echo "启动 dokploy-redis 服务..."
+        echo "启动 dokploy-redis (Valkey 8 Alpine) 服务..."
         docker service create \
             --name dokploy-redis \
+            --constraint 'node.role==manager' \
             --network dokploy-network \
             --mount type=volume,source=dokploy-redis,target=/data \
             valkey/valkey:8-alpine || true
     fi
 
-    # 启动 Postgres 容器服务
+    # 启动 Postgres 16 Alpine 容器服务
     if ! docker service ls | grep -q "dokploy-postgres"; then
-        echo "启动 dokploy-postgres 服务..."
+        echo "启动 dokploy-postgres (Postgres 16 Alpine) 服务..."
         docker service create \
             --name dokploy-postgres \
+            --constraint 'node.role==manager' \
             --network dokploy-network \
             --env POSTGRES_USER=dokploy \
             --env POSTGRES_DB=dokploy \
+            --secret source=dokploy_postgres_password,target=/run/secrets/postgres_password \
+            --env POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password \
             --env POSTGRES_PASSWORD=amukds4wi9001583845717ad2 \
             --mount type=volume,source=dokploy-postgres,target=/var/lib/postgresql/data \
             postgres:16-alpine || true
@@ -134,13 +151,22 @@ install_dokploy() {
         docker service create \
             --name dokploy \
             --replicas 1 \
+            --constraint 'node.role==manager' \
             --network dokploy-network \
             --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
             --mount type=bind,source=/etc/dokploy,target=/etc/dokploy \
-            --publish published=3000,target=3000 \
+            --mount type=volume,source=dokploy,target=/root/.docker \
+            --secret source=dokploy_postgres_password,target=/run/secrets/postgres_password \
+            --secret source=dokploy_auth_secret,target=/run/secrets/dokploy_auth_secret \
+            --publish published=3000,target=3000,mode=host \
+            --update-parallelism 1 \
+            --update-order stop-first \
             --env PORT=3000 \
             --env NODE_ENV=production \
             --env ENABLE_TRAEFIK=false \
+            --env RELEASE_TAG="${VERSION_TAG}" \
+            --env POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password \
+            --env BETTER_AUTH_SECRET_FILE=/run/secrets/dokploy_auth_secret \
             "${DOCKER_IMAGE}"
     fi
 
@@ -150,4 +176,18 @@ install_dokploy() {
     echo "======================================================================"
 }
 
-install_dokploy
+update_dokploy() {
+    VERSION_TAG=$(detect_version)
+    DOCKER_IMAGE="${DOKPLOY_IMAGE_REPO}:${VERSION_TAG}"
+
+    echo "更新 Rain-kl/dokploy 至版本: ${VERSION_TAG}..."
+    docker pull "${DOCKER_IMAGE}"
+    docker service update --image "${DOCKER_IMAGE}" dokploy
+    echo "🎉 Rain-kl/dokploy 更新完成！"
+}
+
+if [ "$1" = "update" ]; then
+    update_dokploy
+else
+    install_dokploy
+fi
