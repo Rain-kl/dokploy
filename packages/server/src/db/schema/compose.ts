@@ -216,6 +216,20 @@ export const apiDeleteCompose = z.object({
 	deleteVolumes: z.boolean(),
 });
 
+// CUSTOM-FEATURE: [Compose Restart/Down] START
+export const apiDownCompose = z.object({
+	composeId: z.string().min(1),
+	volumesToRemove: z
+		.array(
+			z
+				.string()
+				.min(1)
+				.regex(/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/, "Invalid volume name"),
+		)
+		.default([]),
+});
+// CUSTOM-FEATURE: [Compose Restart/Down] END
+
 export const apiFetchServices = z.object({
 	composeId: z.string().min(1),
 	type: z.enum(["fetch", "cache"]).optional().default("cache"),

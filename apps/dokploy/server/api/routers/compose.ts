@@ -8,6 +8,8 @@ import {
 	createDomain,
 	createMount,
 	deleteMount,
+	// CUSTOM-FEATURE: [Compose Restart/Down] START
+	downCompose,
 	execAsync,
 	execAsyncRemote,
 	findComposeById,
@@ -17,6 +19,7 @@ import {
 	findServerById,
 	getAccessibleServerIds,
 	getComposeContainer,
+	getComposeVolumes,
 	getContainerLogs,
 	getWebServerSettings,
 	IS_CLOUD,
@@ -27,6 +30,8 @@ import {
 	removeComposeDirectory,
 	removeDeploymentsByComposeId,
 	removeDomainById,
+	restartCompose,
+	// CUSTOM-FEATURE: [Compose Restart/Down] END
 	startCompose,
 	stopCompose,
 	updateCompose,
@@ -58,6 +63,9 @@ import {
 	apiCreateCompose,
 	apiDeleteCompose,
 	apiDeployCompose,
+	// CUSTOM-FEATURE: [Compose Restart/Down] START
+	apiDownCompose,
+	// CUSTOM-FEATURE: [Compose Restart/Down] END
 	apiFetchServices,
 	apiFindCompose,
 	apiRandomizeCompose,
@@ -538,6 +546,49 @@ export const composeRouter = createTRPCRouter({
 			});
 			return true;
 		}),
+	// CUSTOM-FEATURE: [Compose Restart/Down] START
+	restart: protectedProcedure
+		.input(apiFindCompose)
+		.mutation(async ({ input, ctx }) => {
+			await checkServicePermissionAndAccess(ctx, input.composeId, {
+				deployment: ["create"],
+			});
+			await restartCompose(input.composeId);
+			const composeForRestart = await findComposeById(input.composeId);
+			await audit(ctx, {
+				action: "reload",
+				resourceType: "compose",
+				resourceId: input.composeId,
+				resourceName: composeForRestart.name,
+			});
+			return true;
+		}),
+	getVolumes: protectedProcedure
+		.input(apiFindCompose)
+		.query(async ({ input, ctx }) => {
+			await checkServicePermissionAndAccess(ctx, input.composeId, {
+				service: ["read"],
+			});
+			return await getComposeVolumes(input.composeId);
+		}),
+	down: protectedProcedure
+		.input(apiDownCompose)
+		.mutation(async ({ input, ctx }) => {
+			await checkServicePermissionAndAccess(ctx, input.composeId, {
+				deployment: ["create"],
+			});
+			await downCompose(input.composeId, input.volumesToRemove);
+			const composeForDown = await findComposeById(input.composeId);
+			await audit(ctx, {
+				action: "stop",
+				resourceType: "compose",
+				resourceId: input.composeId,
+				resourceName: composeForDown.name,
+				metadata: { volumesToRemove: input.volumesToRemove },
+			});
+			return true;
+		}),
+	// CUSTOM-FEATURE: [Compose Restart/Down] END
 	getDefaultCommand: protectedProcedure
 		.input(apiFindCompose)
 		.query(async ({ input, ctx }) => {

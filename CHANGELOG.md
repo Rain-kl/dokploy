@@ -4,6 +4,18 @@
 
 ---
 
+## [2026-07-22] - Compose Deploy Settings: Restart / Down
+
+- **修改文件**：
+  - `packages/server/src/services/compose.ts`
+  - `packages/server/src/db/schema/compose.ts`
+  - `apps/dokploy/server/api/routers/compose.ts`
+  - `apps/dokploy/components/dashboard/compose/general/actions.tsx`
+  - `apps/dokploy/components/dashboard/compose/general/compose-down-dialog.tsx`
+- **修改内容**：Compose Deploy Settings 新增 **Restart**（重启 compose 全部服务）与 **Down**（`docker compose down`，弹窗可选移除 Volume）。
+- **功能与背景**：补充 compose 运维动作，Down 支持按项目 volume 勾选删除，仅允许移除本 compose 关联 volume。
+- **上游侵入评估**：微小 (Low) - service/router/UI 以 `CUSTOM-FEATURE: [Compose Restart/Down]` 锚点隔离。
+
 ## [2026-07-22] - Dokploy 二次开发独立发布与核心功能解耦定制
 
 ### 1. 独立镜像源与构建/更新发布流定制 (Custom Release & Docker Registry)

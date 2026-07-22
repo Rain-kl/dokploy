@@ -1,4 +1,11 @@
-import { Ban, CheckCircle2, RefreshCcw, Rocket, Terminal } from "lucide-react";
+import {
+	Ban,
+	CheckCircle2,
+	RefreshCcw,
+	RefreshCw,
+	Rocket,
+	Terminal,
+} from "lucide-react";
 import { useRouter } from "next/router";
 import { Tooltip as TooltipPrimitive } from "radix-ui";
 import { toast } from "sonner";
@@ -13,6 +20,10 @@ import {
 } from "@/components/ui/tooltip";
 import { api } from "@/utils/api";
 import { DockerTerminalModal } from "../../settings/web-server/docker-terminal-modal";
+// CUSTOM-FEATURE: [Compose Restart/Down] START
+import { ComposeDownDialog } from "./compose-down-dialog";
+
+// CUSTOM-FEATURE: [Compose Restart/Down] END
 
 interface Props {
 	composeId: string;
@@ -35,6 +46,10 @@ export const ComposeActions = ({ composeId }: Props) => {
 		api.compose.start.useMutation();
 	const { mutateAsync: stop, isPending: isStopping } =
 		api.compose.stop.useMutation();
+	// CUSTOM-FEATURE: [Compose Restart/Down] START
+	const { mutateAsync: restart, isPending: isRestarting } =
+		api.compose.restart.useMutation();
+	// CUSTOM-FEATURE: [Compose Restart/Down] END
 	return (
 		<div className="flex flex-row gap-4 w-full flex-wrap ">
 			<TooltipProvider delayDuration={0} disableHoverableContent={false}>
@@ -123,6 +138,47 @@ export const ComposeActions = ({ composeId }: Props) => {
 						</Button>
 					</DialogAction>
 				)}
+				{/* CUSTOM-FEATURE: [Compose Restart/Down] START */}
+				{canDeploy && (
+					<DialogAction
+						title="Restart Compose"
+						description="Are you sure you want to restart this compose?"
+						type="default"
+						onClick={async () => {
+							await restart({
+								composeId: composeId,
+							})
+								.then(() => {
+									toast.success("Compose restarted successfully");
+									refetch();
+								})
+								.catch(() => {
+									toast.error("Error restarting compose");
+								});
+						}}
+					>
+						<Button
+							variant="secondary"
+							isLoading={isRestarting || data?.composeStatus === "running"}
+							className="flex items-center gap-1.5 group focus-visible:ring-2 focus-visible:ring-offset-2"
+						>
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<div className="flex items-center">
+										<RefreshCw className="size-4 mr-1" />
+										Restart
+									</div>
+								</TooltipTrigger>
+								<TooltipPrimitive.Portal>
+									<TooltipContent sideOffset={5} className="z-60">
+										<p>Restart all services in this compose project</p>
+									</TooltipContent>
+								</TooltipPrimitive.Portal>
+							</Tooltip>
+						</Button>
+					</DialogAction>
+				)}
+				{/* CUSTOM-FEATURE: [Compose Restart/Down] END */}
 				{canDeploy &&
 					(data?.composeType === "docker-compose" &&
 					data?.composeStatus === "idle" ? (
@@ -203,6 +259,17 @@ export const ComposeActions = ({ composeId }: Props) => {
 							</Button>
 						</DialogAction>
 					))}
+				{/* CUSTOM-FEATURE: [Compose Restart/Down] START */}
+				{canDeploy && (
+					<ComposeDownDialog
+						composeId={composeId}
+						isLoading={data?.composeStatus === "running"}
+						onSuccess={() => {
+							refetch();
+						}}
+					/>
+				)}
+				{/* CUSTOM-FEATURE: [Compose Restart/Down] END */}
 			</TooltipProvider>
 			<DockerTerminalModal
 				appName={data?.appName || ""}

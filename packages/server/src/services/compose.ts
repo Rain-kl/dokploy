@@ -545,3 +545,107 @@ export const stopCompose = async (composeId: string) => {
 
 	return true;
 };
+
+// CUSTOM-FEATURE: [Compose Restart/Down] START
+export const getComposeVolumes = async (
+	composeId: string,
+): Promise<string[]> => {
+	const compose = await findComposeById(composeId);
+	const project = quote([compose.appName]);
+	// Compose projects label volumes with com.docker.compose.project;
+	// stacks may also use com.docker.stack.namespace.
+	const command = `docker volume ls -q --filter label=com.docker.compose.project=${project}; docker volume ls -q --filter label=com.docker.stack.namespace=${project}`;
+
+	try {
+		const { stdout } = compose.serverId
+			? await execAsyncRemote(compose.serverId, command)
+			: await execAsync(command);
+
+		return [
+			...new Set(
+				stdout
+					.trim()
+					.split("\n")
+					.map((line) => line.trim())
+					.filter(Boolean),
+			),
+		];
+	} catch {
+		return [];
+	}
+};
+
+export const restartCompose = async (composeId: string) => {
+	const compose = await findComposeById(composeId);
+	const project = quote([compose.appName]);
+
+	if (compose.composeType === "docker-compose") {
+		const command = `env -i PATH="$PATH" docker compose -p ${project} restart`;
+		if (compose.serverId) {
+			await execAsyncRemote(compose.serverId, command);
+		} else {
+			await execAsync(command);
+		}
+	} else {
+		const command = `for id in $(docker service ls -q --filter label=com.docker.stack.namespace=${project}); do docker service update --force "$id"; done`;
+		if (compose.serverId) {
+			await execAsyncRemote(compose.serverId, command);
+		} else {
+			await execAsync(command);
+		}
+	}
+
+	return true;
+};
+
+export const downCompose = async (
+	composeId: string,
+	volumesToRemove: string[] = [],
+) => {
+	const compose = await findComposeById(composeId);
+	const project = quote([compose.appName]);
+	// Only allow removing volumes that currently belong to this project
+	const allowed = new Set(await getComposeVolumes(composeId));
+	const safeVolumes = volumesToRemove.filter((v) => allowed.has(v));
+
+	try {
+		if (compose.composeType === "docker-compose") {
+			const command = `env -i PATH="$PATH" docker compose -p ${project} down`;
+			if (compose.serverId) {
+				await execAsyncRemote(compose.serverId, command);
+			} else {
+				await execAsync(command);
+			}
+		} else {
+			const command = `docker stack rm ${project}`;
+			if (compose.serverId) {
+				await execAsyncRemote(compose.serverId, command);
+			} else {
+				await execAsync(command);
+			}
+		}
+
+		if (safeVolumes.length > 0) {
+			const rmCommand = `docker volume rm ${safeVolumes
+				.map((v) => quote([v]))
+				.join(" ")}`;
+			if (compose.serverId) {
+				await execAsyncRemote(compose.serverId, rmCommand);
+			} else {
+				await execAsync(rmCommand);
+			}
+		}
+
+		await updateCompose(composeId, {
+			composeStatus: "idle",
+		});
+	} catch (error) {
+		await updateCompose(composeId, {
+			composeStatus: "error",
+		});
+		throw error;
+	}
+
+	return true;
+};
+// CUSTOM-FEATURE: [Compose Restart/Down] END
