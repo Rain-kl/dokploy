@@ -17,6 +17,7 @@
 		"docker:build:canary": "./apps/dokploy/docker/build.sh canary",
 		"typecheck": "pnpm -r run typecheck",
 		"build": "pnpm -r run build",
+		"format": "biome format --write .",
 		"format-and-lint": "biome check .",
 		"check": "biome check --write --no-errors-on-unmatched --files-ignore-unknown=true",
 		"format-and-lint:fix": "biome check . --write",

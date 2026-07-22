@@ -39,7 +39,9 @@ export const initializeStandaloneTraefik = async ({
 }: TraefikOptions = {}) => {
 	// CUSTOM-FEATURE: [Traefik 解耦] START
 	if (!ENABLE_TRAEFIK) {
-		console.log("ENABLE_TRAEFIK is false, skipping initializeStandaloneTraefik");
+		console.log(
+			"ENABLE_TRAEFIK is false, skipping initializeStandaloneTraefik",
+		);
 		return;
 	}
 	// CUSTOM-FEATURE: [Traefik 解耦] END

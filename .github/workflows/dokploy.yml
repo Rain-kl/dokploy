@@ -1,3 +1,5 @@
+# CUSTOM-FEATURE: [独立镜像构建与发布] START
+# 修改背景: 二开仓库推送至 ghcr.io/rain-kl/dokploy，Release 使用本地 script/install.sh
 name: Dokploy Docker Build
 
 on:
@@ -6,7 +8,11 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE_NAME: dokploy/dokploy
+  IMAGE_NAME: ghcr.io/rain-kl/dokploy
+
+permissions:
+  contents: write
+  packages: write
 
 jobs:
   docker-amd:
@@ -18,18 +24,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to Docker Hub
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set tag and version
         id: meta
         run: |
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             TAG="latest"
-            VERSION=$(node -p "require('./apps/dokploy/package.json').version")
           elif [ "${{ github.ref }}" = "refs/heads/canary" ]; then
             TAG="canary"
           else
@@ -49,6 +55,7 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+
   docker-arm:
     runs-on: ubuntu-24.04-arm
     steps:
@@ -58,19 +65,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to Docker Hub
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set tag and version
         id: meta
         run: |
-          VERSION=$(node -p "require('./apps/dokploy/package.json').version")
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             TAG="latest"
-            VERSION=$(node -p "require('./apps/dokploy/package.json').version")
           elif [ "${{ github.ref }}" = "refs/heads/canary" ]; then
             TAG="canary"
           else
@@ -101,11 +107,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to Docker Hub
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create and push manifests
         run: |
@@ -152,12 +159,17 @@ jobs:
           VERSION=$(node -p "require('./apps/dokploy/package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Fetch install.sh
+      - name: Prepare install.sh from local script
         run: |
-          curl -fsSL https://raw.githubusercontent.com/Dokploy/website/main/apps/website/public/install.sh -o install.sh
-          head -1 install.sh | grep -q '^#!' || { echo "Downloaded install.sh is not a shell script"; exit 1; }
-          grep -q 'DOKPLOY_VERSION' install.sh || { echo "install.sh no longer supports DOKPLOY_VERSION pinning"; exit 1; }
-          { head -1 install.sh; echo "DOKPLOY_VERSION=\"\${DOKPLOY_VERSION:-${{ steps.get_version.outputs.version }}}\""; tail -n +2 install.sh; } > install-pinned.sh
+          cp script/install.sh install.sh
+          head -1 install.sh | grep -q '^#!' || { echo "install.sh is not a shell script"; exit 1; }
+          grep -q 'DOKPLOY_VERSION\|detect_version' install.sh || { echo "install.sh does not support version detection"; exit 1; }
+          # 将默认版本钉死为本次 Release 版本（仍可通过环境变量覆盖）
+          {
+            head -1 install.sh
+            echo "DOKPLOY_VERSION=\"\${DOKPLOY_VERSION:-${{ steps.get_version.outputs.version }}}\""
+            tail -n +2 install.sh
+          } > install-pinned.sh
           mv install-pinned.sh install.sh
 
       - name: Create Release
@@ -171,80 +183,4 @@ jobs:
           files: install.sh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  sync-version:
-    needs: [generate-release]
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Sync version to MCP repository
-        run: |
-          git clone https://x-access-token:${{ secrets.DOCS_SYNC_TOKEN }}@github.com/dokploy/mcp.git /tmp/mcp-repo
-          cd /tmp/mcp-repo
-
-          jq --arg v "${{ needs.generate-release.outputs.version }}" '.version = $v' package.json > package.json.tmp
-          mv package.json.tmp package.json
-
-          npm install -g pnpm
-          pnpm install
-          pnpm run fetch-openapi
-          pnpm run generate
-
-          git config user.name "Dokploy Bot"
-          git config user.email "bot@dokploy.com"
-          git add -A
-          git commit -m "chore: bump version to ${{ needs.generate-release.outputs.version }}" \
-            -m "Source: ${{ github.repository }}@${{ github.sha }}" \
-            --allow-empty
-          git push
-
-          echo "✅ MCP repo synced to version ${{ needs.generate-release.outputs.version }}"
-
-      - name: Sync version to CLI repository
-        run: |
-          git clone https://x-access-token:${{ secrets.DOCS_SYNC_TOKEN }}@github.com/dokploy/cli.git /tmp/cli-repo
-          cd /tmp/cli-repo
-
-          jq --arg v "${{ needs.generate-release.outputs.version }}" '.version = $v' package.json > package.json.tmp
-          mv package.json.tmp package.json
-
-          cp ${{ github.workspace }}/openapi.json ./openapi.json
-          npm install -g pnpm
-          pnpm install
-          pnpm run generate
-
-          git config user.name "Dokploy Bot"
-          git config user.email "bot@dokploy.com"
-          git add -A
-          git commit -m "chore: bump version to ${{ needs.generate-release.outputs.version }}" \
-            -m "Source: ${{ github.repository }}@${{ github.sha }}" \
-            --allow-empty
-          git push
-
-          echo "✅ CLI repo synced to version ${{ needs.generate-release.outputs.version }}"
-
-      - name: Sync version to SDK repository
-        run: |
-          git clone https://x-access-token:${{ secrets.DOCS_SYNC_TOKEN }}@github.com/dokploy/sdk.git /tmp/sdk-repo
-          cd /tmp/sdk-repo
-
-          jq --arg v "${{ needs.generate-release.outputs.version }}" '.version = $v' package.json > package.json.tmp
-          mv package.json.tmp package.json
-
-          cp ${{ github.workspace }}/openapi.json ./openapi.json
-          npm install -g pnpm
-          pnpm install
-          pnpm run generate
-
-          git config user.name "Dokploy Bot"
-          git config user.email "bot@dokploy.com"
-          git add -A
-          git commit -m "chore: bump version to ${{ needs.generate-release.outputs.version }}" \
-            -m "Source: ${{ github.repository }}@${{ github.sha }}" \
-            --allow-empty
-          git push
-
-          echo "✅ SDK repo synced to version ${{ needs.generate-release.outputs.version }}"
+# CUSTOM-FEATURE: [独立镜像构建与发布] END

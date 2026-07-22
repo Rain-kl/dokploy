@@ -9,7 +9,7 @@ help:
 	@echo "  make clean     - 清理开发环境 (清理 Docker Swarm 服务、网络与 .docker 本地缓存)"
 	@echo "  make dev       - 启动本地开发服务 (pnpm run dokploy:dev)"
 	@echo "  make typecheck - 运行 TypeScript 类型检查 (pnpm run typecheck)"
-	@echo "  make format    - 运行代码规范修复与 Lint (pnpm run format-and-lint:fix)"
+	@echo "  make format    - 运行代码格式化 (pnpm run format / biome format)"
 	@echo "  make status    - 查看 Dokploy 相关的 Docker Swarm 服务与容器状态"
 	@echo "======================================================================"
 
@@ -47,9 +47,9 @@ dev:
 typecheck:
 	pnpm run typecheck
 
-# 格式化与代码规范修复
+# 格式化代码 (使用 Biome)
 format:
-	pnpm run format-and-lint:fix
+	pnpm run format
 
 # 查看 Docker 服务与容器状态
 status:

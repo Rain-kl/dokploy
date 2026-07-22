@@ -419,10 +419,16 @@ const Service = (
 												<ShowBuildServer applicationId={applicationId} />
 												<ShowResources id={applicationId} type="application" />
 												<ShowVolumes id={applicationId} type="application" />
-												{ENABLE_TRAEFIK && <ShowRedirects applicationId={applicationId} />}
-												{ENABLE_TRAEFIK && <ShowSecurity applicationId={applicationId} />}
+												{ENABLE_TRAEFIK && (
+													<ShowRedirects applicationId={applicationId} />
+												)}
+												{ENABLE_TRAEFIK && (
+													<ShowSecurity applicationId={applicationId} />
+												)}
 												<ShowPorts applicationId={applicationId} />
-												{ENABLE_TRAEFIK && <ShowTraefikConfig applicationId={applicationId} />}
+												{ENABLE_TRAEFIK && (
+													<ShowTraefikConfig applicationId={applicationId} />
+												)}
 											</div>
 										</TabsContent>
 									)}
