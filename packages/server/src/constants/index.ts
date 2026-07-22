@@ -4,9 +4,7 @@ import Docker from "dockerode";
 
 export const IS_CLOUD = process.env.IS_CLOUD === "true";
 
-// CUSTOM-FEATURE: [Traefik 解耦] START (修改背景: 默认彻底禁用/去除 Traefik 强依赖)
-export const ENABLE_TRAEFIK = process.env.ENABLE_TRAEFIK === "true";
-// CUSTOM-FEATURE: [Traefik 解耦] END
+export { ENABLE_TRAEFIK } from "./env";
 
 export const DOKPLOY_DOCKER_API_VERSION =
 	process.env.DOKPLOY_DOCKER_API_VERSION;

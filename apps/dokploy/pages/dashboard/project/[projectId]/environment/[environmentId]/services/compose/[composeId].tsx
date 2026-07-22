@@ -1,3 +1,4 @@
+import { ENABLE_TRAEFIK } from "@dokploy/server/constants/env";
 import { validateRequest } from "@dokploy/server/lib/auth";
 import { createServerSideHelpers } from "@trpc/react-query/server";
 import copy from "copy-to-clipboard";
@@ -227,7 +228,7 @@ const Service = (
 													Environment
 												</TabsTrigger>
 											)}
-											{permissions?.domain.read && (
+											{permissions?.domain.read && ENABLE_TRAEFIK && (
 												<TabsTrigger value="domains">Domains</TabsTrigger>
 											)}
 											{permissions?.deployment.read && (
@@ -407,7 +408,7 @@ const Service = (
 										</TabsContent>
 									)}
 
-									{permissions?.domain.read && (
+									{permissions?.domain.read && ENABLE_TRAEFIK && (
 										<TabsContent value="domains">
 											<div className="flex flex-col gap-4 pt-2.5">
 												<ShowDomains id={composeId} type="compose" />

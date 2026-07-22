@@ -7,6 +7,7 @@
 ## [2026-07-22] - 解耦并移除 Traefik 强制反向代理依赖
 
 - **修改文件**：
+  - `packages/server/src/constants/env.ts`
   - `packages/server/src/constants/index.ts`
   - `packages/server/src/setup/traefik-setup.ts`
   - `packages/server/src/utils/traefik/application.ts`
@@ -14,9 +15,11 @@
   - `packages/server/src/services/settings.ts`
   - `packages/server/src/services/compose.ts`
   - `apps/dokploy/setup.ts`
-- **修改内容**：新增 `ENABLE_TRAEFIK` 控制开关（默认设为 `false`），彻底跳过 `dokploy-traefik` 镜像拉取、容器启动及动态 YAML 路由配置生成。
-- **功能与背景**：实现 Dokploy 与 Traefik 的反向代理强依赖解耦，允许应用直接发布宿主机端口并使用外部网关（如 Nginx、Caddy、Cloudflare Tunnel）。
-- **上游侵入评估**：极小 (Low) - 采用可配置开关与注释锚点隔离防护，对上游源码逻辑零破坏。
+  - `apps/dokploy/pages/dashboard/project/[projectId]/environment/[environmentId]/services/application/[applicationId].tsx`
+  - `apps/dokploy/pages/dashboard/project/[projectId]/environment/[environmentId]/services/compose/[composeId].tsx`
+- **修改内容**：新增 `ENABLE_TRAEFIK` 控制开关（默认 `false`），彻底跳过 `dokploy-traefik` 容器拉起与动态 YAML 生成，并在前端页面中动态隐藏 Domains 标签页及 Traefik 高级设置组件。
+- **功能与背景**：实现 Dokploy 与 Traefik 的反向代理强依赖解耦，界面上不再展示多余的 Domains 反代配置项，支持直接暴露宿主机端口。
+- **上游侵入评估**：极小 (Low) - 采用 `ENABLE_TRAEFIK` 条件判断与注释锚点隔离，无破坏性修改。
 
 ---
 

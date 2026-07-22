@@ -16,6 +16,10 @@
     "./constants": {
       "import": "./src/constants/index.ts",
       "require": "./dist/constants.cjs.js"
+    },
+    "./constants/*": {
+      "import": "./src/constants/*.ts",
+      "require": "./dist/constants/*.cjs.js"
     }
   },
   "scripts": {
