@@ -4,6 +4,35 @@
 
 ---
 
+## [2026-07-22] - SSO 绑定改为 OpenID→当前账户（禁止建用户/切号）
+
+- **修改文件**：
+  - `packages/server/src/custom/sso-account-link.ts`（新）
+  - `apps/dokploy/pages/api/auth/[...all].ts`
+  - `apps/dokploy/server/api/routers/proprietary/sso.ts`
+  - `apps/dokploy/components/dashboard/settings/linking-account/linking-account.tsx`
+  - `packages/server/package.json`
+- **修改内容**：
+  - Profile 绑定不再调用 `signIn.sso`（避免按邮箱找/建用户并切换会话）。
+  - 新流程：将 IdP OpenID `sub` 写入 `account` 表并关联**当前登录用户**；不创建用户、不改 session。
+  - 回调路径复用 `/api/auth/sso/callback/:providerId`，由自定义逻辑优先处理 link state。
+- **功能与背景**：修复 admin@admin.com 绑定后被切到 SSO 邮箱账户、权限丢失的问题。
+- **上游侵入评估**：微小 (Low) - auth 入口挂钩 + custom 隔离目录。
+
+## [2026-07-22] - SSO 一键登录与 Profile 绑定
+
+- **修改文件**：
+  - `apps/dokploy/server/api/routers/proprietary/sso.ts`
+  - `apps/dokploy/components/proprietary/sso/sign-in-with-sso.tsx`
+  - `apps/dokploy/components/dashboard/settings/linking-account/linking-account.tsx`
+  - `apps/dokploy/pages/dashboard/settings/profile.tsx`
+  - `packages/server/src/lib/auth.ts`
+- **修改内容**：
+  - 登录页 SSO 不再输入邮箱，按已配置 provider 一键跳转 IdP。
+  - Profile「Linking account」支持绑定/解绑 SSO；自托管始终展示该区域。
+- **功能与背景**：简化企业 SSO 使用路径。
+- **上游侵入评估**：微小 (Low) - `CUSTOM-FEATURE: [SSO One-Click Login/Link]` 锚点。
+
 ## [2026-07-22] - 部署绕过 Traefik 逻辑 (ENABLE_TRAEFIK=false)
 
 - **修改文件**：

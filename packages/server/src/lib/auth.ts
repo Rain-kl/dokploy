@@ -92,6 +92,10 @@ const createBetterAuth = () =>
 		account: {
 			accountLinking: {
 				enabled: true,
+				// CUSTOM-FEATURE: [SSO One-Click Login/Link] START
+				// Self-hosted users often have emailVerified=false; allow SSO implicit link by email.
+				requireLocalEmailVerified: false,
+				// CUSTOM-FEATURE: [SSO One-Click Login/Link] END
 				async trustedProviders() {
 					const fromDb = await getTrustedProviders();
 					return ["github", "google", ...fromDb];

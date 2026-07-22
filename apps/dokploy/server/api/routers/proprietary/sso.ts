@@ -16,6 +16,7 @@ import { z } from "zod";
 import {
 	createTRPCRouter,
 	enterpriseProcedure,
+	protectedProcedure,
 	publicProcedure,
 } from "@/server/api/trpc";
 
@@ -25,6 +26,59 @@ export const ssoRouter = createTRPCRouter({
 		return true;
 	}),
 	// CUSTOM-FEATURE: [Unlock Enterprise] END
+	// CUSTOM-FEATURE: [SSO One-Click Login/Link] START
+	/** Public list for login page — no secrets, used for one-click SSO. */
+	listPublicProviders: publicProcedure.query(async () => {
+		const providers = await db.query.ssoProvider.findMany({
+			columns: {
+				providerId: true,
+				issuer: true,
+				domain: true,
+			},
+			orderBy: [asc(ssoProvider.createdAt)],
+		});
+		return providers;
+	}),
+	/** Providers available to link on the current user's profile. */
+	listLinkableProviders: protectedProcedure.query(async () => {
+		const providers = await db.query.ssoProvider.findMany({
+			columns: {
+				providerId: true,
+				issuer: true,
+				domain: true,
+			},
+			orderBy: [asc(ssoProvider.createdAt)],
+		});
+		return providers;
+	}),
+	/**
+	 * Start binding IdP OpenID subject to the *current* session user.
+	 * Does not create users and does not switch account by email.
+	 */
+	startLink: protectedProcedure
+		.input(z.object({ providerId: z.string().min(1) }))
+		.mutation(async ({ ctx, input }) => {
+			try {
+				const { startSsoAccountLink, getRequestOrigin } = await import(
+					"@dokploy/server/custom/sso-account-link"
+				);
+				const origin = getRequestOrigin(ctx.req);
+				return await startSsoAccountLink({
+					userId: ctx.user.id,
+					providerId: input.providerId,
+					origin,
+				});
+			} catch (error) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message:
+						error instanceof Error
+							? error.message
+							: "Failed to start SSO account link",
+				});
+			}
+		}),
+	// CUSTOM-FEATURE: [SSO One-Click Login/Link] END
 	enforceSSO: publicProcedure.query(async () => {
 		if (IS_CLOUD) {
 			return false;
