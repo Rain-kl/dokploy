@@ -1,6 +1,8 @@
 import fs, { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { paths } from "@dokploy/server/constants";
+// CUSTOM-FEATURE: [Traefik 解耦] START
+import { ENABLE_TRAEFIK, paths } from "@dokploy/server/constants";
+// CUSTOM-FEATURE: [Traefik 解耦] END
 import type { Compose } from "@dokploy/server/services/compose";
 import type { Domain } from "@dokploy/server/services/domain";
 import { parse, stringify } from "yaml";
@@ -160,6 +162,14 @@ export const addDomainToCompose = async (
 		const randomized = randomizeSpecificationFile(result, compose.suffix);
 		result = randomized;
 	}
+
+	// CUSTOM-FEATURE: [Traefik 解耦] START
+	// Domains / Traefik labels / dokploy-network are only applied when Traefik is enabled.
+	// Isolation & randomize above still run so deploys work without reverse proxy.
+	if (!ENABLE_TRAEFIK) {
+		return result;
+	}
+	// CUSTOM-FEATURE: [Traefik 解耦] END
 
 	for (const domain of domains) {
 		const { serviceName, https } = domain;

@@ -1,5 +1,7 @@
 import { dirname, join } from "node:path";
-import { paths } from "@dokploy/server/constants";
+// CUSTOM-FEATURE: [Traefik 解耦] START
+import { ENABLE_TRAEFIK, paths } from "@dokploy/server/constants";
+// CUSTOM-FEATURE: [Traefik 解耦] END
 import type { InferResultType } from "@dokploy/server/types/with";
 import boxen from "boxen";
 import { quote } from "shell-quote";
@@ -42,6 +44,13 @@ Compose Type: ${composeType} ✅`;
 		borderStyle: "double",
 	});
 
+	// CUSTOM-FEATURE: [Traefik 解耦] START
+	const connectTraefik =
+		ENABLE_TRAEFIK && compose.isolatedDeployment
+			? `docker network connect ${compose.appName} $(docker ps --filter "name=dokploy-traefik" -q) >/dev/null 2>&1`
+			: "";
+	// CUSTOM-FEATURE: [Traefik 解耦] END
+
 	const bashCommand = `
 	set -e
 	{
@@ -55,7 +64,7 @@ Compose Type: ${composeType} ✅`;
 
 		${compose.isolatedDeployment ? `docker network inspect ${compose.appName} >/dev/null 2>&1 || docker network create ${compose.composeType === "stack" ? "--driver overlay" : ""} --attachable ${compose.appName}` : ""}
 		env -i PATH="$PATH" HOME="$HOME" ${exportEnvCommand} docker ${command.split(" ").join(" ")} 2>&1 || { echo "Error: ❌ Docker command failed"; exit 1; }
-		${compose.isolatedDeployment ? `docker network connect ${compose.appName} $(docker ps --filter "name=dokploy-traefik" -q) >/dev/null 2>&1` : ""}
+		${connectTraefik}
 
 		echo "Docker Compose Deployed: ✅";
 	} || {

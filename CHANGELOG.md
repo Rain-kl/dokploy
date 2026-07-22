@@ -4,6 +4,15 @@
 
 ---
 
+## [2026-07-22] - 部署绕过 Traefik 逻辑 (ENABLE_TRAEFIK=false)
+
+- **修改文件**：
+  - `packages/server/src/utils/docker/domain.ts`
+  - `packages/server/src/utils/builders/compose.ts`
+- **修改内容**：`ENABLE_TRAEFIK` 关闭时，Compose 部署跳过 Domain 标签注入、`dokploy-network` 挂接、以及连接 `dokploy-traefik` 网络；仍保留 isolation/randomize。
+- **功能与背景**：无 Traefik 场景下部署不应因 Domain/service 校验或 Traefik 标签失败（如模板附带的 sslip.io domain）。
+- **上游侵入评估**：微小 (Low) - `CUSTOM-FEATURE: [Traefik 解耦]` 锚点。
+
 ## [2026-07-22] - Compose Deploy Settings: Restart / Down
 
 - **修改文件**：
