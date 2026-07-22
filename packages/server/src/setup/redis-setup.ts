@@ -3,7 +3,9 @@ import { docker } from "../constants";
 import { pullImage } from "../utils/docker/utils";
 
 export const initializeRedis = async () => {
-	const imageName = "redis:8";
+	// CUSTOM-FEATURE: [Database Image Customization] START (使用 valkey/valkey:8-alpine 镜像)
+	const imageName = "valkey/valkey:8-alpine";
+	// CUSTOM-FEATURE: [Database Image Customization] END
 	const containerName = "dokploy-redis";
 
 	const settings: CreateServiceOptions = {

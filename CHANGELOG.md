@@ -4,6 +4,33 @@
 
 ---
 
+## [2026-07-22] - 调整基础设施 Postgres 与 Redis 容器镜像为 Alpine / Valkey
+
+- **修改文件**：
+  - `packages/server/src/setup/postgres-setup.ts`
+  - `packages/server/src/setup/redis-setup.ts`
+  - `packages/server/src/db/schema/postgres.ts`
+  - `packages/server/src/db/schema/redis.ts`
+  - `script/install.sh`
+- **修改内容**：将 PostgreSQL 镜像统一切换为 `postgres:16-alpine`；将 Redis 镜像统一切换为开源轻量的 `valkey/valkey:8-alpine`。
+- **功能与背景**：大幅精简 Docker 基础设施镜像体积与系统资源开销，提供更高效安全的运行时环境。
+- **上游侵入评估**：极小 (Low)。
+
+---
+
+## [2026-07-22] - 二开独立安装脚本与镜像源定制
+
+- **修改文件**：
+  - `script/install.sh`
+  - `apps/dokploy/docker/build.sh`
+  - `apps/dokploy/docker/push.sh`
+  - `apps/dokploy/server/api/routers/settings.ts`
+- **修改内容**：在本地 `script/install.sh` 创建专属安装脚本，并将 Docker 镜像源切至 `Rain-kl/dokploy` (`ghcr.io/rain-kl/dokploy`)。
+- **功能与背景**：实现二次开发仓库独立安装与镜像升级，脱离 Dokploy 官方源绑定。
+- **上游侵入评估**：极小 (Low)。
+
+---
+
 ## [2026-07-22] - 移除企业版 License 远程校验，企业功能全开
 
 - **修改文件**：

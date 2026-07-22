@@ -1,0 +1,153 @@
+#!/bin/bash
+
+# ==============================================================================
+# Dokploy 二次开发版本一键安装脚本 (Rain-kl/dokploy)
+# ==============================================================================
+
+DOCKER_VERSION="28.5.0"
+# 支持通过环境变量 DOKPLOY_IMAGE_REPO 自定义 Docker 镜像源，默认使用 ghcr.io/rain-kl/dokploy
+DOKPLOY_IMAGE_REPO="${DOKPLOY_IMAGE_REPO:-ghcr.io/rain-kl/dokploy}"
+
+# 检测 GitHub 版本或环境变量指定版本
+detect_version() {
+    local version="${DOKPLOY_VERSION}"
+    
+    if [ -z "$version" ]; then
+        echo "正在从 GitHub (Rain-kl/dokploy) 自动检测最新 Release 版本..." >&2
+        
+        version=$(curl -fsSL --connect-timeout 10 -o /dev/null -w '%{url_effective}\n' \
+            https://github.com/Rain-kl/dokploy/releases/latest 2>/dev/null | \
+            sed 's#.*/tag/##')
+
+        case "$version" in
+            v[0-9]*) ;;
+            *) version="" ;;
+        esac
+
+        if [ -z "$version" ]; then
+            echo "提示: 未检测到官方 Release 标签，默认使用最新镜像 Tag (latest)" >&2
+            version="latest"
+        else
+            echo "检测到最新发布版本: $version" >&2
+        fi
+    fi
+    
+    echo "$version"
+}
+
+# 随机生成安全 Auth 秘钥
+generate_random_password() {
+    local password=""
+    if command -v openssl >/dev/null 2>&1; then
+        password=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-32)
+    elif [ -r /dev/urandom ]; then
+        password=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32)
+    else
+        password=$(echo "$(date +%s%N)-$(hostname)-$$-$RANDOM" | base64 | tr -d "=+/" | head -c 32)
+    fi
+    echo "$password"
+}
+
+install_dokploy() {
+    VERSION_TAG=$(detect_version)
+    DOCKER_IMAGE="${DOKPLOY_IMAGE_REPO}:${VERSION_TAG}"
+    
+    echo "======================================================================"
+    echo " 开始部署 Rain-kl/dokploy (镜像: ${DOCKER_IMAGE})"
+    echo "======================================================================"
+
+    if [ "$(id -u)" != "0" ]; then
+        echo "错误: 本安装脚本必须以 root 权限运行" >&2
+        exit 1
+    fi
+
+    if [ "$(uname)" = "Darwin" ]; then
+        echo "错误: 生产部署脚本仅支持 Linux 系统，本地 macOS 请使用 'make setup' 进行二开调试" >&2
+        exit 1
+    fi
+
+    if [ -f /.dockerenv ]; then
+        echo "错误: 脚本不能在 Docker 容器内部运行" >&2
+        exit 1
+    fi
+
+    # 安装/检查 Docker
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "正在安装 Docker..."
+        curl -fsSL https://get.docker.com -o get-docker.sh
+        sh get-docker.sh --version "${DOCKER_VERSION}"
+        rm -f get-docker.sh
+    fi
+
+    # 初始化 Docker Swarm
+    if ! docker info --format '{{.Swarm.LocalNodeState}}' | grep -q "active"; then
+        echo "初始化 Docker Swarm..."
+        docker swarm init || true
+    fi
+
+    # 创建 overlay 网络
+    if ! docker network ls | grep -q "dokploy-network"; then
+        echo "创建 dokploy-network 网络..."
+        docker network create --driver overlay --attachable dokploy-network || true
+    fi
+
+    # 创建配置路径与秘钥
+    mkdir -p /etc/dokploy
+    if [ ! -f /etc/dokploy/auth_secret ]; then
+        AUTH_SECRET=$(generate_random_password)
+        echo "$AUTH_SECRET" > /etc/dokploy/auth_secret
+        chmod 600 /etc/dokploy/auth_secret
+    fi
+
+    # 启动 Redis 容器服务
+    if ! docker service ls | grep -q "dokploy-redis"; then
+        echo "启动 dokploy-redis 服务..."
+        docker service create \
+            --name dokploy-redis \
+            --network dokploy-network \
+            --mount type=volume,source=dokploy-redis,target=/data \
+            valkey/valkey:8-alpine || true
+    fi
+
+    # 启动 Postgres 容器服务
+    if ! docker service ls | grep -q "dokploy-postgres"; then
+        echo "启动 dokploy-postgres 服务..."
+        docker service create \
+            --name dokploy-postgres \
+            --network dokploy-network \
+            --env POSTGRES_USER=dokploy \
+            --env POSTGRES_DB=dokploy \
+            --env POSTGRES_PASSWORD=amukds4wi9001583845717ad2 \
+            --mount type=volume,source=dokploy-postgres,target=/var/lib/postgresql/data \
+            postgres:16-alpine || true
+    fi
+
+    # 拉取并启动 Dokploy 服务
+    echo "拉取最新 Dokploy 镜像 (${DOCKER_IMAGE})..."
+    docker pull "${DOCKER_IMAGE}"
+
+    if docker service ls | grep -q "dokploy"; then
+        echo "更新已有 Dokploy 服务镜像..."
+        docker service update --image "${DOCKER_IMAGE}" dokploy
+    else
+        echo "创建并拉起 Dokploy Swarm 服务..."
+        docker service create \
+            --name dokploy \
+            --replicas 1 \
+            --network dokploy-network \
+            --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
+            --mount type=bind,source=/etc/dokploy,target=/etc/dokploy \
+            --publish published=3000,target=3000 \
+            --env PORT=3000 \
+            --env NODE_ENV=production \
+            --env ENABLE_TRAEFIK=false \
+            "${DOCKER_IMAGE}"
+    fi
+
+    echo "======================================================================"
+    echo "🎉 Rain-kl/dokploy 部署成功！"
+    echo "访问地址: http://<你的服务器IP>:3000"
+    echo "======================================================================"
+}
+
+install_dokploy

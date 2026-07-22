@@ -2,7 +2,9 @@ import type { CreateServiceOptions } from "dockerode";
 import { docker } from "../constants";
 import { pullImage } from "../utils/docker/utils";
 export const initializePostgres = async () => {
-	const imageName = "postgres:16";
+	// CUSTOM-FEATURE: [Database Image Customization] START (使用 postgres:16-alpine 镜像)
+	const imageName = "postgres:16-alpine";
+	// CUSTOM-FEATURE: [Database Image Customization] END
 	const containerName = "dokploy-postgres";
 	const settings: CreateServiceOptions = {
 		Name: containerName,

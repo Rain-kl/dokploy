@@ -594,12 +594,14 @@ export const settingsRouter = createTRPCRouter({
 
 		const data = await getUpdateData(packageInfo.version);
 		if (data.updateAvailable) {
+			const imageRepo =
+				process.env.DOKPLOY_IMAGE_REPO || "ghcr.io/rain-kl/dokploy";
 			void spawnAsync("docker", [
 				"service",
 				"update",
 				"--force",
 				"--image",
-				`dokploy/dokploy:${data.latestVersion}`,
+				`${imageRepo}:${data.latestVersion}`,
 				"dokploy",
 			]);
 			await audit(ctx, {
