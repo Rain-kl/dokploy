@@ -113,7 +113,10 @@ export const writeDomainsToCompose = async (
 	domains: Domain[],
 ) => {
 	try {
-		const composeConverted = await addDomainToCompose(compose, domains);
+		// CUSTOM-FEATURE: [Traefik 解耦] START
+		const domainsToApply = ENABLE_TRAEFIK ? domains : [];
+		// CUSTOM-FEATURE: [Traefik 解耦] END
+		const composeConverted = await addDomainToCompose(compose, domainsToApply);
 		const path = getComposePath(compose);
 
 		if (!composeConverted) {
@@ -164,9 +167,7 @@ export const addDomainToCompose = async (
 	}
 
 	// CUSTOM-FEATURE: [Traefik 解耦] START
-	// Domains / Traefik labels / dokploy-network are only applied when Traefik is enabled.
-	// Isolation & randomize above still run so deploys work without reverse proxy.
-	if (!ENABLE_TRAEFIK) {
+	if (!ENABLE_TRAEFIK || domains.length === 0) {
 		return result;
 	}
 	// CUSTOM-FEATURE: [Traefik 解耦] END
