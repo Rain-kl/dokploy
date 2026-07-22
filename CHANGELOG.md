@@ -25,7 +25,9 @@
   - `apps/dokploy/docker/build.sh`
   - `apps/dokploy/docker/push.sh`
   - `apps/dokploy/server/api/routers/settings.ts`
-- **修改内容**：在本地 `script/install.sh` 创建专属安装脚本，并将 Docker 镜像源切至 `Rain-kl/dokploy` (`ghcr.io/rain-kl/dokploy`)。
+  - `packages/server/src/services/settings.ts`
+  - `apps/dokploy/components/dashboard/settings/web-server/update-server.tsx`
+- **修改内容**：在本地 `script/install.sh` 创建专属安装脚本，将 Docker 镜像源切至 `Rain-kl/dokploy` (`ghcr.io/rain-kl/dokploy`)，并将后台版本更新检测 (`getUpdateData`)、控制台重载 (`reloadDokploy`) 及前端 Release Notes 链接全部修正指向 `Rain-kl/dokploy`。
 - **功能与背景**：实现二次开发仓库独立安装与镜像升级，脱离 Dokploy 官方源绑定。
 - **上游侵入评估**：极小 (Low)。
 

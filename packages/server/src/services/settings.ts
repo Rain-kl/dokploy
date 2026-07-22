@@ -50,73 +50,26 @@ export const getUpdateData = async (
 	currentVersion: string,
 ): Promise<IUpdateData> => {
 	try {
-		const baseUrl =
-			"https://hub.docker.com/v2/repositories/dokploy/dokploy/tags";
-		let url: string | null = `${baseUrl}?page_size=100`;
-		let allResults: { digest: string; name: string }[] = [];
-
-		// Fetch all tags from Docker Hub
-		while (url) {
-			const response = await fetch(url, {
+		// CUSTOM-FEATURE: [Auto Update Customization] START (修改背景: 请求 Rain-kl/dokploy GitHub Releases 最新版本)
+		const repo = process.env.GITHUB_REPOSITORY || "Rain-kl/dokploy";
+		const response = await fetch(
+			`https://api.github.com/repos/${repo}/releases/latest`,
+			{
 				method: "GET",
-				headers: { "Content-Type": "application/json" },
-			});
-
-			const data = (await response.json()) as {
-				next: string | null;
-				results: { digest: string; name: string }[];
-			};
-
-			allResults = allResults.concat(data.results);
-			url = data?.next;
-		}
-
-		const currentImageTag = getDokployImageTag();
-
-		// Special handling for canary and feature branches
-		// For development versions (canary/feature), don't perform update checks
-		// These are unstable versions that change frequently, and users on these
-		// branches are expected to manually manage updates
-		if (currentImageTag === "canary" || currentImageTag === "feature") {
-			const currentDigest = await getServiceImageDigest();
-			const latestDigest = allResults.find(
-				(t) => t.name === currentImageTag,
-			)?.digest;
-			if (!latestDigest) {
-				return DEFAULT_UPDATE_DATA;
-			}
-			if (currentDigest !== latestDigest) {
-				return {
-					latestVersion: currentImageTag,
-					updateAvailable: true,
-				};
-			}
-			return {
-				latestVersion: currentImageTag,
-				updateAvailable: false,
-			};
-		}
-
-		// For stable versions, use semver comparison
-		// Find the "latest" tag and get its digest
-		const latestTag = allResults.find((t) => t.name === "latest");
-
-		if (!latestTag) {
-			return DEFAULT_UPDATE_DATA;
-		}
-
-		// Find the versioned tag (v0.x.x) that has the same digest as "latest"
-		const latestVersionTag = allResults.find(
-			(t) => t.digest === latestTag.digest && t.name.startsWith("v"),
+				headers: {
+					"Content-Type": "application/json",
+					"User-Agent": "Dokploy-App",
+				},
+			},
 		);
 
-		if (!latestVersionTag) {
+		if (!response.ok) {
 			return DEFAULT_UPDATE_DATA;
 		}
 
-		const latestVersion = latestVersionTag.name;
+		const data = (await response.json()) as { tag_name?: string };
+		const latestVersion = data.tag_name || "";
 
-		// Use semver to compare versions for stable releases
 		const cleanedCurrent = semver.clean(currentVersion);
 		const cleanedLatest = semver.clean(latestVersion);
 
@@ -124,13 +77,13 @@ export const getUpdateData = async (
 			return DEFAULT_UPDATE_DATA;
 		}
 
-		// Check if the latest version is greater than the current version
 		const updateAvailable = semver.gt(cleanedLatest, cleanedCurrent);
 
 		return {
 			latestVersion,
 			updateAvailable,
 		};
+		// CUSTOM-FEATURE: [Auto Update Customization] END
 	} catch (error) {
 		console.error("Error fetching update data:", error);
 		return DEFAULT_UPDATE_DATA;
@@ -296,7 +249,9 @@ export const reloadDockerResource = async (
 				imageTag = currentImageTag;
 			}
 
-			command = `docker service update --force --image dokploy/dokploy:${imageTag} ${resourceName}`;
+			const imageRepo =
+				process.env.DOKPLOY_IMAGE_REPO || "ghcr.io/rain-kl/dokploy";
+			command = `docker service update --force --image ${imageRepo}:${imageTag} ${resourceName}`;
 		} else {
 			command = `docker service update --force ${resourceName}`;
 		}
