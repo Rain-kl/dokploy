@@ -9,13 +9,14 @@
 ### 1. 独立镜像源与构建/更新发布流定制 (Custom Release & Docker Registry)
 - **修改文件**：
   - `.github/workflows/dokploy.yml`
+  - `.github/workflows/create-pr.yml`
   - `script/install.sh`
   - `apps/dokploy/docker/build.sh`
   - `apps/dokploy/docker/push.sh`
   - `apps/dokploy/server/api/routers/settings.ts`
   - `packages/server/src/services/settings.ts`
   - `apps/dokploy/components/dashboard/settings/web-server/update-server.tsx`
-- **修改内容与背景**：全面将构建、发布与版本更新机制指向独立镜像源 `Rain-kl/dokploy` (`ghcr.io/rain-kl/dokploy`)。将后台版本更新检测 (`getUpdateData`)、控制台重载 (`reloadDokploy`)、前端 Release Notes 链接及 GitHub Actions CI/CD 流水线与独立安装脚本全线对齐。
+- **修改内容与背景**：全面将构建、发布与版本更新机制指向独立镜像源 `Rain-kl/dokploy` (`ghcr.io/rain-kl/dokploy`)。分支：`feat` 唯一主线（推送 `:feat` / `:latest` / `:version` 并打 GitHub Release）；`canary` 仅同步上游不构建；停用 `main` 与 promote PR。后台更新检测、控制台重载、Release Notes 与 `script/install.sh` 全线对齐。
 - **上游侵入评估**：极小 (Low)。
 
 ### 2. 基础设施容器镜像精简 (Postgres & Redis/Valkey Optimization)

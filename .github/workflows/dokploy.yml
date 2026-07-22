@@ -1,10 +1,13 @@
 # CUSTOM-FEATURE: [独立镜像构建与发布] START
-# 修改背景: 二开仓库推送至 ghcr.io/rain-kl/dokploy，Release 使用本地 script/install.sh
+# 分支策略:
+#   canary - 仅同步上游，不触发本流水线
+#   feat   - 唯一主线：推送 :feat / :latest / :version，并创建 GitHub Release
+#   main   - 不使用
 name: Dokploy Docker Build
 
 on:
   push:
-    branches: [main, canary, "fix/re-apply-database-migration-fix"]
+    branches: [feat]
   workflow_dispatch:
 
 env:
@@ -31,17 +34,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set tag and version
+      - name: Set tags
         id: meta
         run: |
-          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            TAG="latest"
-          elif [ "${{ github.ref }}" = "refs/heads/canary" ]; then
-            TAG="canary"
-          else
-            TAG="feature"
-          fi
-          echo "tags=${IMAGE_NAME}:${TAG}-amd64" >> $GITHUB_OUTPUT
+          VERSION=$(node -p "require('./apps/dokploy/package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tags=${IMAGE_NAME}:feat-amd64,${IMAGE_NAME}:latest-amd64,${IMAGE_NAME}:${VERSION}-amd64" >> $GITHUB_OUTPUT
 
       - name: Prepare env file
         run: |
@@ -72,17 +70,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set tag and version
+      - name: Set tags
         id: meta
         run: |
-          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            TAG="latest"
-          elif [ "${{ github.ref }}" = "refs/heads/canary" ]; then
-            TAG="canary"
-          else
-            TAG="feature"
-          fi
-          echo "tags=${IMAGE_NAME}:${TAG}-arm64" >> $GITHUB_OUTPUT
+          VERSION=$(node -p "require('./apps/dokploy/package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tags=${IMAGE_NAME}:feat-arm64,${IMAGE_NAME}:latest-arm64,${IMAGE_NAME}:${VERSION}-arm64" >> $GITHUB_OUTPUT
 
       - name: Prepare env file
         run: |
@@ -100,6 +93,8 @@ jobs:
   combine-manifests:
     needs: [docker-amd, docker-arm]
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -115,71 +110,48 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create and push manifests
+        id: meta
         run: |
-          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            VERSION=$(node -p "require('./apps/dokploy/package.json').version")
-            TAG="latest"
+          VERSION=$(node -p "require('./apps/dokploy/package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
+          for TAG in feat latest "$VERSION"; do
             docker buildx imagetools create -t ${IMAGE_NAME}:${TAG} \
               ${IMAGE_NAME}:${TAG}-amd64 \
               ${IMAGE_NAME}:${TAG}-arm64
-
-            docker buildx imagetools create -t ${IMAGE_NAME}:${VERSION} \
-              ${IMAGE_NAME}:${TAG}-amd64 \
-              ${IMAGE_NAME}:${TAG}-arm64
-
-          elif [ "${{ github.ref }}" = "refs/heads/canary" ]; then
-            TAG="canary"
-            docker buildx imagetools create -t ${IMAGE_NAME}:${TAG} \
-              ${IMAGE_NAME}:${TAG}-amd64 \
-              ${IMAGE_NAME}:${TAG}-arm64
-
-          else
-            TAG="feature"
-            docker buildx imagetools create -t ${IMAGE_NAME}:${TAG} \
-              ${IMAGE_NAME}:${TAG}-amd64 \
-              ${IMAGE_NAME}:${TAG}-arm64
-          fi
+          done
 
   generate-release:
     needs: [combine-manifests]
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.get_version.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Get version
-        id: get_version
-        run: |
-          VERSION=$(node -p "require('./apps/dokploy/package.json').version")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
       - name: Prepare install.sh from local script
         run: |
+          VERSION="${{ needs.combine-manifests.outputs.version }}"
           cp script/install.sh install.sh
           head -1 install.sh | grep -q '^#!' || { echo "install.sh is not a shell script"; exit 1; }
           grep -q 'DOKPLOY_VERSION\|detect_version' install.sh || { echo "install.sh does not support version detection"; exit 1; }
-          # 将默认版本钉死为本次 Release 版本（仍可通过环境变量覆盖）
           {
             head -1 install.sh
-            echo "DOKPLOY_VERSION=\"\${DOKPLOY_VERSION:-${{ steps.get_version.outputs.version }}}\""
+            echo "DOKPLOY_VERSION=\"\${DOKPLOY_VERSION:-${VERSION}}\""
             tail -n +2 install.sh
           } > install-pinned.sh
           mv install-pinned.sh install.sh
 
-      - name: Create Release
+      - name: Create or update Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.get_version.outputs.version }}
-          name: ${{ steps.get_version.outputs.version }}
+          tag_name: ${{ needs.combine-manifests.outputs.version }}
+          name: ${{ needs.combine-manifests.outputs.version }}
           generate_release_notes: true
           draft: false
           prerelease: false
+          make_latest: true
           files: install.sh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

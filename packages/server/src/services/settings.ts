@@ -245,9 +245,15 @@ export const reloadDockerResource = async (
 		if (resourceName === "dokploy") {
 			const currentImageTag = getDokployImageTag();
 			let imageTag = version;
-			if (currentImageTag === "canary" || currentImageTag === "feature") {
+			// CUSTOM-FEATURE: [独立镜像构建与发布] START (feat 为二开主线预览 tag)
+			if (
+				currentImageTag === "canary" ||
+				currentImageTag === "feature" ||
+				currentImageTag === "feat"
+			) {
 				imageTag = currentImageTag;
 			}
+			// CUSTOM-FEATURE: [独立镜像构建与发布] END
 
 			const imageRepo =
 				process.env.DOKPLOY_IMAGE_REPO || "ghcr.io/rain-kl/dokploy";
