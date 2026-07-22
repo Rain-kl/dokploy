@@ -1,5 +1,6 @@
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
+import { ENABLE_TRAEFIK } from "@dokploy/server/constants";
 import {
 	execAsync,
 	execAsyncRemote,
@@ -452,6 +453,12 @@ export const checkPortInUse = async (
 };
 
 export const writeTraefikSetup = async (input: TraefikOptions) => {
+	// CUSTOM-FEATURE: [Traefik 解耦] START
+	if (!ENABLE_TRAEFIK) {
+		console.log("ENABLE_TRAEFIK is false, skipping writeTraefikSetup");
+		return;
+	}
+	// CUSTOM-FEATURE: [Traefik 解耦] END
 	const resourceType = await getDockerResourceType(
 		"dokploy-traefik",
 		input.serverId,
@@ -478,6 +485,9 @@ export const writeTraefikSetup = async (input: TraefikOptions) => {
 };
 
 export const reconnectServicesToTraefik = async (serverId?: string) => {
+	// CUSTOM-FEATURE: [Traefik 解耦] START
+	if (!ENABLE_TRAEFIK) return;
+	// CUSTOM-FEATURE: [Traefik 解耦] END
 	const composeResult = await db.query.compose.findMany({
 		where: and(
 			...(serverId ? [eq(compose.serverId, serverId)] : []),

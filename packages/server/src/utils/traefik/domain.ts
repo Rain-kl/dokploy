@@ -1,3 +1,4 @@
+import { ENABLE_TRAEFIK } from "@dokploy/server/constants";
 import type { Domain } from "@dokploy/server/services/domain";
 import type { ApplicationNested } from "../builders";
 import {
@@ -18,6 +19,9 @@ import {
 import { createPathMiddlewares, removePathMiddlewares } from "./middleware";
 
 export const manageDomain = async (app: ApplicationNested, domain: Domain) => {
+	// CUSTOM-FEATURE: [Traefik 解耦] START
+	if (!ENABLE_TRAEFIK) return;
+	// CUSTOM-FEATURE: [Traefik 解耦] END
 	const { appName } = app;
 	let config: FileConfig;
 
@@ -69,6 +73,9 @@ export const removeDomain = async (
 	application: ApplicationNested,
 	uniqueKey: number,
 ) => {
+	// CUSTOM-FEATURE: [Traefik 解耦] START
+	if (!ENABLE_TRAEFIK) return;
+	// CUSTOM-FEATURE: [Traefik 解耦] END
 	const { appName, serverId } = application;
 	let config: FileConfig;
 

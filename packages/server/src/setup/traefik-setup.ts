@@ -9,7 +9,7 @@ import {
 import path from "node:path";
 import type { ContainerCreateOptions, CreateServiceOptions } from "dockerode";
 import { stringify } from "yaml";
-import { paths } from "../constants";
+import { ENABLE_TRAEFIK, paths } from "../constants";
 import { getRemoteDocker } from "../utils/servers/remote-docker";
 import type { FileConfig } from "../utils/traefik/file-types";
 import type { MainTraefikConfig } from "../utils/traefik/types";
@@ -37,6 +37,12 @@ export const initializeStandaloneTraefik = async ({
 	serverId,
 	additionalPorts = [],
 }: TraefikOptions = {}) => {
+	// CUSTOM-FEATURE: [Traefik 解耦] START
+	if (!ENABLE_TRAEFIK) {
+		console.log("ENABLE_TRAEFIK is false, skipping initializeStandaloneTraefik");
+		return;
+	}
+	// CUSTOM-FEATURE: [Traefik 解耦] END
 	const { MAIN_TRAEFIK_PATH, DYNAMIC_TRAEFIK_PATH } = paths(!!serverId);
 	const imageName = `traefik:v${TRAEFIK_VERSION}`;
 	const containerName = "dokploy-traefik";
@@ -122,6 +128,12 @@ export const initializeTraefikService = async ({
 	additionalPorts = [],
 	serverId,
 }: TraefikOptions) => {
+	// CUSTOM-FEATURE: [Traefik 解耦] START
+	if (!ENABLE_TRAEFIK) {
+		console.log("ENABLE_TRAEFIK is false, skipping initializeTraefikService");
+		return;
+	}
+	// CUSTOM-FEATURE: [Traefik 解耦] END
 	const { MAIN_TRAEFIK_PATH, DYNAMIC_TRAEFIK_PATH } = paths(!!serverId);
 	const imageName = `traefik:v${TRAEFIK_VERSION}`;
 	const appName = "dokploy-traefik";

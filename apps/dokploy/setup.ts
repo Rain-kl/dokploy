@@ -19,21 +19,30 @@ import {
 	TRAEFIK_VERSION,
 } from "@dokploy/server/setup/traefik-setup";
 
+// CUSTOM-FEATURE: [Traefik 解耦] START (修改背景: 支持无 Traefik 模式)
+import { ENABLE_TRAEFIK } from "@dokploy/server/constants";
+// CUSTOM-FEATURE: [Traefik 解耦] END
+
 (async () => {
 	try {
 		setupDirectories();
-		createDefaultMiddlewares();
+		if (ENABLE_TRAEFIK) {
+			createDefaultMiddlewares();
+		}
 		await initializeSwarm();
 		await initializeNetwork();
-		createDefaultTraefikConfig();
-		createDefaultServerTraefikConfig();
-		await execAsync(`docker pull traefik:v${TRAEFIK_VERSION}`);
-		await initializeStandaloneTraefik();
+		if (ENABLE_TRAEFIK) {
+			createDefaultTraefikConfig();
+			createDefaultServerTraefikConfig();
+			await execAsync(`docker pull traefik:v${TRAEFIK_VERSION}`);
+			await initializeStandaloneTraefik();
+		}
 		await initializeRedis();
 		await initializePostgres();
 		console.log("Dokploy setup completed");
 		exit(0);
 	} catch (e) {
 		console.error("Error in dokploy setup", e);
+		exit(1);
 	}
 })();

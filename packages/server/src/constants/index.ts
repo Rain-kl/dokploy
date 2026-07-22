@@ -4,6 +4,10 @@ import Docker from "dockerode";
 
 export const IS_CLOUD = process.env.IS_CLOUD === "true";
 
+// CUSTOM-FEATURE: [Traefik 解耦] START (修改背景: 默认彻底禁用/去除 Traefik 强依赖)
+export const ENABLE_TRAEFIK = process.env.ENABLE_TRAEFIK === "true";
+// CUSTOM-FEATURE: [Traefik 解耦] END
+
 export const DOKPLOY_DOCKER_API_VERSION =
 	process.env.DOKPLOY_DOCKER_API_VERSION;
 export const DOKPLOY_DOCKER_HOST = process.env.DOKPLOY_DOCKER_HOST;
@@ -46,6 +50,18 @@ const getDockerConfig = (): Docker => {
 	}
 
 	if (process.env.HOME) {
+		dockerSocketCandidates.push({
+			label: "Docker Desktop macOS socket",
+			path: `${process.env.HOME}/.docker/run/docker.sock`,
+		});
+		dockerSocketCandidates.push({
+			label: "OrbStack socket",
+			path: `${process.env.HOME}/.orbstack/run/docker.sock`,
+		});
+		dockerSocketCandidates.push({
+			label: "Colima socket",
+			path: `${process.env.HOME}/.colima/default/docker.sock`,
+		});
 		dockerSocketCandidates.push({
 			label: "Rancher Desktop socket",
 			path: `${process.env.HOME}/.rd/docker.sock`,

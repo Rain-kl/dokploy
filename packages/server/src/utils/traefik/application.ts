@@ -1,7 +1,7 @@
 import fs, { createReadStream, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline";
-import { paths } from "@dokploy/server/constants";
+import { ENABLE_TRAEFIK, paths } from "@dokploy/server/constants";
 import type { Domain } from "@dokploy/server/services/domain";
 import { quote } from "shell-quote";
 import { parse, stringify } from "yaml";
@@ -10,6 +10,9 @@ import { execAsync, execAsyncRemote } from "../process/execAsync";
 import type { FileConfig, HttpLoadBalancerService } from "./file-types";
 
 export const createTraefikConfig = (appName: string) => {
+	// CUSTOM-FEATURE: [Traefik 解耦] START
+	if (!ENABLE_TRAEFIK) return;
+	// CUSTOM-FEATURE: [Traefik 解耦] END
 	const defaultPort = 3000;
 	const serviceURLDefault = `http://${appName}:${defaultPort}`;
 	const domainDefault = `Host(\`${appName}.docker.localhost\`)`;
