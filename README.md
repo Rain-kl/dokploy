@@ -40,6 +40,11 @@ To get started, run the following command on a VPS:
 curl -sSL https://raw.githubusercontent.com/Rain-kl/dokploy/feat/script/install.sh | bash
 ```
 
+for update
+```bash
+curl -sSL https://raw.githubusercontent.com/Rain-kl/dokploy/feat/script/install.sh | bash -s update
+```
+
 For detailed documentation, visit [docs.dokploy.com](https://docs.dokploy.com).
 
 
