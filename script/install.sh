@@ -145,7 +145,12 @@ install_dokploy() {
 
     if docker service ls | grep -q "dokploy"; then
         echo "更新已有 Dokploy 服务镜像..."
-        docker service update --image "${DOCKER_IMAGE}" dokploy
+        IMAGE_DIGEST=$(docker image inspect --format='{{index .RepoDigests 0}}' "${DOCKER_IMAGE}" 2>/dev/null || true)
+        if [ -n "$IMAGE_DIGEST" ]; then
+            docker service update --image "${IMAGE_DIGEST}" --force --with-registry-auth dokploy
+        else
+            docker service update --image "${DOCKER_IMAGE}" --force --with-registry-auth dokploy
+        fi
     else
         echo "创建并拉起 Dokploy Swarm 服务..."
         docker service create \
@@ -182,7 +187,29 @@ update_dokploy() {
 
     echo "更新 Rain-kl/dokploy 至版本: ${VERSION_TAG}..."
     docker pull "${DOCKER_IMAGE}"
-    docker service update --image "${DOCKER_IMAGE}" dokploy
+
+    # Swarm pins Image as name:tag@sha256:... After a same-tag rebuild, --image name:tag
+    # alone often keeps the old digest (no real rollout). Resolve the just-pulled digest
+    # and force a new task so the running container always matches the pulled image.
+    IMAGE_DIGEST=$(docker image inspect --format='{{index .RepoDigests 0}}' "${DOCKER_IMAGE}" 2>/dev/null || true)
+    if [ -n "$IMAGE_DIGEST" ]; then
+        echo "使用已拉取镜像 digest: ${IMAGE_DIGEST}"
+        docker service update \
+            --image "${IMAGE_DIGEST}" \
+            --force \
+            --with-registry-auth \
+            dokploy
+    else
+        echo "警告: 未能解析 RepoDigest，回退为 --force 更新 tag..."
+        docker service update \
+            --image "${DOCKER_IMAGE}" \
+            --force \
+            --with-registry-auth \
+            dokploy
+    fi
+
+    echo "当前服务镜像:"
+    docker service inspect dokploy --format '{{.Spec.TaskTemplate.ContainerSpec.Image}}' 2>/dev/null || true
     echo "🎉 Rain-kl/dokploy 更新完成！"
 }
 
