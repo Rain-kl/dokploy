@@ -1,24 +1,9 @@
-import { db } from "@dokploy/server/db";
-import { user } from "@dokploy/server/db/schema";
-import { eq } from "drizzle-orm";
-import { getOrganizationOwnerId } from "./sso";
-
-export const hasValidLicense = async (organizationId: string) => {
-	const ownerId = await getOrganizationOwnerId(organizationId);
-
-	if (!ownerId) {
-		return false;
-	}
-
-	const currentUser = await db.query.user.findFirst({
-		where: eq(user.id, ownerId),
-		columns: {
-			enableEnterpriseFeatures: true,
-			isValidEnterpriseLicense: true,
-		},
-	});
-	return !!(
-		currentUser?.enableEnterpriseFeatures &&
-		currentUser?.isValidEnterpriseLicense
-	);
+// CUSTOM-FEATURE: [Unlock Enterprise] START (修改背景: 移除 License 合法性校验，企业功能全开)
+/**
+ * Enterprise license gate — always grants access.
+ * Remote license validation against licenses-api.dokploy.com has been removed.
+ */
+export const hasValidLicense = async (_organizationId: string) => {
+	return true;
 };
+// CUSTOM-FEATURE: [Unlock Enterprise] END

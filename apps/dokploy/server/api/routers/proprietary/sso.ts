@@ -1,7 +1,7 @@
 import { normalizeTrustedOrigin } from "@dokploy/server";
 import { IS_CLOUD } from "@dokploy/server/constants";
 import { db } from "@dokploy/server/db";
-import { member, ssoProvider, user } from "@dokploy/server/db/schema";
+import { ssoProvider, user } from "@dokploy/server/db/schema";
 import { ssoProviderBodySchema } from "@dokploy/server/db/schema/sso";
 import {
 	getOrganizationOwnerId,
@@ -20,31 +20,11 @@ import {
 } from "@/server/api/trpc";
 
 export const ssoRouter = createTRPCRouter({
+	// CUSTOM-FEATURE: [Unlock Enterprise] START (修改背景: SSO 入口不再依赖 License)
 	showSignInWithSSO: publicProcedure.query(async () => {
-		if (IS_CLOUD) {
-			return true;
-		}
-		const owner = await db.query.member.findFirst({
-			where: eq(member.role, "owner"),
-			with: {
-				user: {
-					columns: {
-						enableEnterpriseFeatures: true,
-						isValidEnterpriseLicense: true,
-					},
-				},
-			},
-			orderBy: [asc(member.createdAt)],
-		});
-
-		if (!owner) {
-			return false;
-		}
-
-		return (
-			owner.user.enableEnterpriseFeatures && owner.user.isValidEnterpriseLicense
-		);
+		return true;
 	}),
+	// CUSTOM-FEATURE: [Unlock Enterprise] END
 	enforceSSO: publicProcedure.query(async () => {
 		if (IS_CLOUD) {
 			return false;

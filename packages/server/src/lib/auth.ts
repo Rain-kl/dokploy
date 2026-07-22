@@ -420,20 +420,13 @@ const createBetterAuth = () =>
 				references: "user",
 			}),
 			sso({ trustEmailVerified: true }),
+			// CUSTOM-FEATURE: [Unlock Enterprise] START (修改背景: 移除 SCIM 的 enterprise license 校验)
 			scim({
-				beforeSCIMTokenGenerated: async ({ user }) => {
-					const dbUser = await db.query.user.findFirst({
-						where: eq(schema.user.id, user.id),
-						columns: { enableEnterpriseFeatures: true },
-					});
-
-					if (!dbUser?.enableEnterpriseFeatures) {
-						throw new APIError("FORBIDDEN", {
-							message: "SCIM provisioning requires an enterprise license",
-						});
-					}
+				beforeSCIMTokenGenerated: async () => {
+					// Enterprise unlocked — SCIM always allowed
 				},
 			}),
+			// CUSTOM-FEATURE: [Unlock Enterprise] END
 			twoFactor(),
 			organization({
 				ac,

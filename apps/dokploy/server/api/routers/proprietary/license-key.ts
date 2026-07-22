@@ -37,22 +37,17 @@ export const licenseKeyRouter = createTRPCRouter({
 					});
 				}
 
-				if (!currentUser.enableEnterpriseFeatures) {
-					throw new TRPCError({
-						code: "BAD_REQUEST",
-						message:
-							"Please activate enterprise features to activate license key",
-					});
-				}
-
+				// CUSTOM-FEATURE: [Unlock Enterprise] START (修改背景: 激活不再校验官方节点 / enable 开关)
 				await activateLicenseKey(input.licenseKey);
 				await db
 					.update(user)
 					.set({
 						licenseKey: input.licenseKey,
+						enableEnterpriseFeatures: true,
 						isValidEnterpriseLicense: true,
 					})
 					.where(eq(user.id, currentUserId));
+				// CUSTOM-FEATURE: [Unlock Enterprise] END
 				return { success: true };
 			} catch (error) {
 				throw new TRPCError({
@@ -92,20 +87,18 @@ export const licenseKeyRouter = createTRPCRouter({
 				});
 			}
 
-			if (!currentUser.enableEnterpriseFeatures) {
-				throw new TRPCError({
-					code: "BAD_REQUEST",
-					message:
-						"Please activate enterprise features to validate license key",
-				});
-			}
+			// CUSTOM-FEATURE: [Unlock Enterprise] START (修改背景: 本地校验恒 true)
 			const valid = await validateLicenseKey(currentUser.licenseKey);
 			if (valid) {
 				await db
 					.update(user)
-					.set({ isValidEnterpriseLicense: true })
+					.set({
+						enableEnterpriseFeatures: true,
+						isValidEnterpriseLicense: true,
+					})
 					.where(eq(user.id, currentUserId));
 			}
+			// CUSTOM-FEATURE: [Unlock Enterprise] END
 			return valid;
 		} catch (error) {
 			throw new TRPCError({

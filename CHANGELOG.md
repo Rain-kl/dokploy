@@ -4,6 +4,21 @@
 
 ---
 
+## [2026-07-22] - 移除企业版 License 远程校验，企业功能全开
+
+- **修改文件**：
+  - `packages/server/src/services/proprietary/license-key.ts`
+  - `packages/server/src/utils/crons/enterprise.ts`
+  - `apps/dokploy/server/utils/enterprise.ts`
+  - `packages/server/src/lib/auth.ts`
+  - `apps/dokploy/server/api/routers/proprietary/sso.ts`
+  - `apps/dokploy/server/api/routers/proprietary/license-key.ts`
+- **修改内容**：`hasValidLicense` 恒返回 true；禁用 3 天一次的 `licenses-api.dokploy.com` 远程校验定时任务；activate/validate/deactivate 本地化 no-op；移除 SCIM/SSO 对 License 的依赖。
+- **功能与背景**：自托管场景下企业功能（SSO、SCIM、自定义角色、审计日志、白标等）无需官方 License 即可使用，不再向官方验证节点上报 `{ licenseKey, ip }`。
+- **上游侵入评估**：微小 (Low) - 以 `CUSTOM-FEATURE: [Unlock Enterprise]` 锚点隔离，核心门闩集中在 `hasValidLicense`。
+
+---
+
 ## [2026-07-22] - 解耦并移除 Traefik 强制反向代理依赖
 
 - **修改文件**：
