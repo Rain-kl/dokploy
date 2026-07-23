@@ -4,9 +4,16 @@ import {
 	getServiceContainerCommand,
 } from "../../utils/backups/utils";
 import { execAsync, execAsyncRemote } from "../../utils/process/execAsync";
+import {
+	type ListableDatabaseType,
+	parseListedDatabases,
+} from "./parse-listed-databases";
+
+export type { ListableDatabaseType };
+export { parseListedDatabases };
 
 export type ListDatabasesInput = {
-	databaseType: "postgres" | "mysql" | "mariadb" | "mongo";
+	databaseType: ListableDatabaseType;
 	appName: string;
 	serverId?: string | null;
 	databaseUser?: string;
@@ -16,14 +23,6 @@ export type ListDatabasesInput = {
 	serviceName?: string | null;
 	backupType?: "database" | "compose";
 };
-
-const SYSTEM_MYSQL = new Set([
-	"information_schema",
-	"performance_schema",
-	"mysql",
-	"sys",
-]);
-const SYSTEM_MONGO = new Set(["admin", "local", "config"]);
 
 export const getListDatabasesInnerCommand = (
 	type: ListDatabasesInput["databaseType"],
@@ -44,23 +43,6 @@ export const getListDatabasesInnerCommand = (
 		default:
 			throw new Error("Unsupported type");
 	}
-};
-
-export const parseListedDatabases = (
-	type: ListDatabasesInput["databaseType"],
-	stdout: string,
-): string[] => {
-	const names = stdout
-		.split("\n")
-		.map((l) => l.trim())
-		.filter(Boolean);
-	if (type === "mysql" || type === "mariadb") {
-		return names.filter((n) => !SYSTEM_MYSQL.has(n));
-	}
-	if (type === "mongo") {
-		return names.filter((n) => !SYSTEM_MONGO.has(n));
-	}
-	return names;
 };
 
 export const listDatabasesForService = async (

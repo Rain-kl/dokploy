@@ -282,10 +282,12 @@ export const getBackupCommand = (
 		`Executing backup command: ${backup.databaseType} ${backup.backupType}`,
 	);
 
+	// CUSTOM-FEATURE: multi-database-backup — single dump stream (no double pg_dump)
+	const logDbLabel = quote([dbName]);
 	return `
 	set -eo pipefail;
-	echo "[$(date)] Starting backup process..." >> ${logPath};
-	echo "[$(date)] Executing backup command..." >> ${logPath};
+	echo "[$(date)] Starting backup process for ${logDbLabel}..." >> ${logPath};
+	echo "[$(date)] Executing backup + upload..." >> ${logPath};
 	CONTAINER_ID=$(${containerSearch})
 
 	if [ -z "$CONTAINER_ID" ]; then
@@ -295,24 +297,14 @@ export const getBackupCommand = (
 
 	echo "[$(date)] Container Up: $CONTAINER_ID" >> ${logPath};
 
-	# Run the backup command and capture the exit status
-	BACKUP_OUTPUT=$(${backupCommand} 2>&1 >/dev/null) || {
-		echo "[$(date)] ❌ Error: Backup failed" >> ${logPath};
-		echo "Error: $BACKUP_OUTPUT" >> ${logPath};
-		exit 1;
-	}
-
-	echo "[$(date)] ✅ backup completed successfully" >> ${logPath};
-	echo "[$(date)] Starting upload to S3..." >> ${logPath};
-
-	# Run the upload command and capture the exit status
-	UPLOAD_OUTPUT=$(${backupCommand} | ${rcloneCommand} 2>&1 >/dev/null) || {
-		echo "[$(date)] ❌ Error: Upload to S3 failed" >> ${logPath};
+	# One dump piped to rclone (avoid dumping twice per database)
+	UPLOAD_OUTPUT=$(${backupCommand} | ${rcloneCommand} 2>&1) || {
+		echo "[$(date)] ❌ Error: Backup or upload failed for ${logDbLabel}" >> ${logPath};
 		echo "Error: $UPLOAD_OUTPUT" >> ${logPath};
 		exit 1;
 	}
 
-	echo "[$(date)] ✅ Upload to S3 completed successfully" >> ${logPath};
+	echo "[$(date)] ✅ Backup and upload completed for ${logDbLabel}" >> ${logPath};
 	echo "Backup done ✅" >> ${logPath};
 	`;
 };

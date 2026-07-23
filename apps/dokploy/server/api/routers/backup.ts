@@ -511,11 +511,15 @@ export const backupRouter = createTRPCRouter({
 				input.mariadbId ||
 				input.mongoId ||
 				input.composeId;
-			if (serviceId) {
-				await checkServicePermissionAndAccess(ctx, serviceId, {
-					backup: ["read"],
-				});
+			if (!serviceId) {
+				return {
+					databases: [] as string[],
+					warning: "No database service specified",
+				};
 			}
+			await checkServicePermissionAndAccess(ctx, serviceId, {
+				backup: ["read"],
+			});
 
 			if (input.backupType === "compose" && input.composeId) {
 				const compose = await findComposeById(input.composeId);

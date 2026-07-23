@@ -1,3 +1,4 @@
+import { parseListedDatabases } from "@dokploy/server/custom/backups/parse-listed-databases";
 import {
 	normalizeBackupDatabaseFields,
 	resolveBackupDatabases,
@@ -55,5 +56,33 @@ describe("sanitizeBackupDbFilePart", () => {
 		expect(`${part}-${ts}.sql.gz`).toBe(
 			"app-db-2026-07-23T00-00-00-000Z.sql.gz",
 		);
+	});
+	test("multi-db filenames stay unique", () => {
+		const ts = "2026-07-23T00-00-00-000Z";
+		const a = `${sanitizeBackupDbFilePart("app")}-${ts}.sql.gz`;
+		const b = `${sanitizeBackupDbFilePart("other")}-${ts}.sql.gz`;
+		expect(a).not.toBe(b);
+	});
+});
+
+describe("parseListedDatabases", () => {
+	test("filters mysql system dbs", () => {
+		expect(
+			parseListedDatabases(
+				"mysql",
+				"mysql\napp\ninformation_schema\nfoo\nsys\nperformance_schema",
+			),
+		).toEqual(["app", "foo"]);
+	});
+	test("filters mongo system dbs", () => {
+		expect(
+			parseListedDatabases("mongo", "admin\nlocal\nconfig\napp"),
+		).toEqual(["app"]);
+	});
+	test("keeps postgres names", () => {
+		expect(parseListedDatabases("postgres", "dokploy\napp")).toEqual([
+			"dokploy",
+			"app",
+		]);
 	});
 });

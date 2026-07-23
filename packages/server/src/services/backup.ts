@@ -69,9 +69,13 @@ export const updateBackupById = async (
 		backupData.database !== undefined ||
 		backupData.databases !== undefined
 	) {
+		// Prefer explicit databases list; empty array falls back via resolve helpers
 		const normalized = normalizeBackupDatabaseFields({
 			database: backupData.database,
-			databases: backupData.databases ?? undefined,
+			databases:
+				backupData.databases && backupData.databases.length > 0
+					? backupData.databases
+					: undefined,
 		});
 		data = { ...data, ...normalized };
 	}
