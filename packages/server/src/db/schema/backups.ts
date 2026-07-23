@@ -93,6 +93,8 @@ export const backups = pgTable("backup", {
 				mariadb?: {
 					databaseUser: string;
 					databasePassword: string;
+					// CUSTOM-FEATURE: multi-database-backup — root for full list
+					databaseRootPassword?: string;
 				};
 				mongo?: {
 					databaseUser: string;

@@ -105,6 +105,8 @@ const Schema = z
 					.object({
 						databaseUser: z.string(),
 						databasePassword: z.string(),
+						// CUSTOM-FEATURE: multi-database-backup — root for full DB list
+						databaseRootPassword: z.string().optional(),
 					})
 					.optional(),
 				mongo: z
@@ -939,6 +941,28 @@ export const HandleBackup = ({
 																{...field}
 															/>
 														</FormControl>
+														<FormMessage />
+													</FormItem>
+												)}
+											/>
+											{/* CUSTOM-FEATURE: multi-database-backup — root for listDatabases */}
+											<FormField
+												control={form.control}
+												name="metadata.mariadb.databaseRootPassword"
+												render={({ field }) => (
+													<FormItem>
+														<FormLabel>Root Password</FormLabel>
+														<FormControl>
+															<Input
+																type="password"
+																placeholder="••••••••"
+																{...field}
+															/>
+														</FormControl>
+														<FormDescription>
+															Used to list all databases (SHOW DATABASES as
+															root). Backup dump still uses the user above.
+														</FormDescription>
 														<FormMessage />
 													</FormItem>
 												)}

@@ -34,10 +34,12 @@ export const getListDatabasesInnerCommand = (
 	switch (type) {
 		case "postgres":
 			return `docker exec -e DB_USER=${quote([creds.databaseUser || ""])} -i $CONTAINER_ID bash -c 'psql -h localhost -U "$DB_USER" -d postgres -tAc "SELECT datname FROM pg_database WHERE datistemplate = false AND datallowconn"'`;
+		// MySQL / MariaDB: always list as root so SHOW DATABASES is complete
 		case "mysql":
 			return `docker exec -e DB_PASS=${quote([creds.databaseRootPassword || ""])} -i $CONTAINER_ID bash -c 'mysql -uroot -p"$DB_PASS" -N -e "SHOW DATABASES"'`;
 		case "mariadb":
-			return `docker exec -e DB_USER=${quote([creds.databaseUser || ""])} -e DB_PASS=${quote([creds.databasePassword || ""])} -i $CONTAINER_ID bash -c 'mariadb -u"$DB_USER" -p"$DB_PASS" -N -e "SHOW DATABASES"'`;
+			return `docker exec -e DB_PASS=${quote([creds.databaseRootPassword || creds.databasePassword || ""])} -i $CONTAINER_ID bash -c 'mariadb -uroot -p"$DB_PASS" -N -e "SHOW DATABASES"'`;
+		// Mongo: listDatabases requires admin-capable user (auth DB admin)
 		case "mongo":
 			return `docker exec -e DB_USER=${quote([creds.databaseUser || ""])} -e DB_PASS=${quote([creds.databasePassword || ""])} -i $CONTAINER_ID bash -c 'mongosh --quiet -u "$DB_USER" -p "$DB_PASS" --authenticationDatabase admin --eval "db.adminCommand({ listDatabases: 1 }).databases.map(d => d.name).join(\\"\\n\\")"'`;
 		default:

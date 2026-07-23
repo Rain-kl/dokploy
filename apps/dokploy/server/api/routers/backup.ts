@@ -490,8 +490,10 @@ export const backupRouter = createTRPCRouter({
 						mysql: z.object({ databaseRootPassword: z.string() }).optional(),
 						mariadb: z
 							.object({
-								databaseUser: z.string(),
-								databasePassword: z.string(),
+								databaseUser: z.string().optional(),
+								databasePassword: z.string().optional(),
+								// CUSTOM-FEATURE: multi-database-backup — prefer root for list
+								databaseRootPassword: z.string().optional(),
 							})
 							.optional(),
 						mongo: z
@@ -543,12 +545,16 @@ export const backupRouter = createTRPCRouter({
 						meta?.mongo?.databaseUser,
 					databasePassword:
 						meta?.mariadb?.databasePassword || meta?.mongo?.databasePassword,
-					databaseRootPassword: meta?.mysql?.databaseRootPassword,
+					// MySQL/MariaDB list use root password for full catalog
+					databaseRootPassword:
+						meta?.mysql?.databaseRootPassword ||
+						meta?.mariadb?.databaseRootPassword,
 				});
 			}
 
 			if (input.postgresId) {
 				const postgres = await findPostgresById(input.postgresId);
+				// POSTGRES_USER is superuser in official images
 				return listDatabasesForService({
 					databaseType: "postgres",
 					appName: postgres.appName,
@@ -569,12 +575,12 @@ export const backupRouter = createTRPCRouter({
 			}
 			if (input.mariadbId) {
 				const mariadb = await findMariadbById(input.mariadbId);
+				// CUSTOM-FEATURE: multi-database-backup — list as root
 				return listDatabasesForService({
 					databaseType: "mariadb",
 					appName: mariadb.appName,
 					serverId: mariadb.serverId,
-					databaseUser: mariadb.databaseUser,
-					databasePassword: mariadb.databasePassword,
+					databaseRootPassword: mariadb.databaseRootPassword,
 					backupType: "database",
 				});
 			}
