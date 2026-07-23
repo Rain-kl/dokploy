@@ -1,3 +1,4 @@
+import { appendBackupLog } from "@dokploy/server/custom/backups/append-backup-log";
 import {
 	resolveBackupDatabases,
 	sanitizeBackupDbFilePart,
@@ -36,6 +37,7 @@ export const runComposeBackup = async (
 	}
 	const timestamp = getBackupTimestamp();
 	const ext = databaseType === "mongo" ? "bson" : "sql";
+	let currentDb = dbNames[0]!;
 	// CUSTOM-FEATURE: multi-database-backup END
 	const s3AppName = serviceName ? `${appName}_${serviceName}` : appName;
 	const deployment = await createDeploymentBackup({
@@ -49,6 +51,7 @@ export const runComposeBackup = async (
 
 		// CUSTOM-FEATURE: multi-database-backup START
 		for (const dbName of dbNames) {
+			currentDb = dbName;
 			const backupFileName = `${sanitizeBackupDbFilePart(dbName)}-${timestamp}.${ext}.gz`;
 			const bucketDestination = `${s3AppName}/${normalizeS3Path(prefix)}${backupFileName}`;
 			const rcloneDestination = `:s3:${destination.bucket}/${bucketDestination}`;
@@ -81,13 +84,21 @@ export const runComposeBackup = async (
 		await updateDeploymentStatus(deployment.deploymentId, "done");
 	} catch (error) {
 		console.log(error);
+		// CUSTOM-FEATURE: multi-database-backup
+		const errMsg =
+			// @ts-ignore
+			error?.message || "Error message not provided";
+		await appendBackupLog(
+			deployment.logPath,
+			`❌ Failed while backing up database: ${currentDb} — ${errMsg}`,
+			compose.serverId,
+		);
 		await sendDatabaseBackupNotifications({
 			applicationName: name,
 			projectName: project.name,
 			databaseType: getDatabaseType(databaseType),
 			type: "error",
-			// @ts-ignore
-			errorMessage: error?.message || "Error message not provided",
+			errorMessage: errMsg,
 			organizationId: project.organizationId,
 			databaseName: dbNames.join(", "),
 		});

@@ -1,4 +1,6 @@
 import { CLEANUP_CRON_JOB } from "@dokploy/server/constants";
+// CUSTOM-FEATURE: multi-database-backup
+import { selectBackupFilesToDelete } from "@dokploy/server/custom/backups/keep-latest-by-run";
 import { member } from "@dokploy/server/db/schema";
 import type { BackupSchedule } from "@dokploy/server/services/backup";
 import { findDestinationById } from "@dokploy/server/services/destination";
@@ -138,20 +140,32 @@ export const keepLatestNBackups = async (
 		const appName = getServiceAppName(backup);
 		const backupFilesPath = `:s3:${destination.bucket}/${appName}/${normalizeS3Path(backup.prefix)}`;
 
-		// --include "*.bson.gz" or "*.sql.gz" or "*.zip" ensures nothing else other than the dokploy backup files are touched by rclone
+		// CUSTOM-FEATURE: multi-database-backup — keep N runs (not N files)
+		// --include ensures only dokploy backup dumps/archives are listed
 		const rcloneList = `rclone lsf ${rcloneFlags.join(" ")} --include "*${backup.databaseType === "web-server" ? ".zip" : ".{sql.gz,bson.gz}"}" ${backupFilesPath}`;
-		// when we pipe the above command with this one, we only get the list of files we want to delete
-		const sortAndPickUnwantedBackups = `sort -r | tail -n +$((${backup.keepLatestCount}+1)) | xargs -I{}`;
-		// this command deletes the files
-		// to test the deletion before actually deleting we can add --dry-run before ${backupFilesPath}{}
-		const rcloneDelete = `rclone delete ${rcloneFlags.join(" ")} ${backupFilesPath}{}`;
 
-		const rcloneCommand = `${rcloneList} | ${sortAndPickUnwantedBackups} ${rcloneDelete}`;
+		const listResult = serverId
+			? await execAsyncRemote(serverId, rcloneList)
+			: await execAsync(rcloneList);
+		const stdout =
+			typeof listResult === "string"
+				? listResult
+				: (listResult as { stdout?: string }).stdout || "";
+		const files = stdout
+			.split("\n")
+			.map((l) => l.trim())
+			.filter(Boolean);
+		const toDelete = selectBackupFilesToDelete(files, backup.keepLatestCount);
+		if (toDelete.length === 0) return;
 
-		if (serverId) {
-			await execAsyncRemote(serverId, rcloneCommand);
-		} else {
-			await execAsync(rcloneCommand);
+		// Delete each excess file from the oldest runs
+		for (const file of toDelete) {
+			const rcloneDelete = `rclone delete ${rcloneFlags.join(" ")} ${backupFilesPath}${file}`;
+			if (serverId) {
+				await execAsyncRemote(serverId, rcloneDelete);
+			} else {
+				await execAsync(rcloneDelete);
+			}
 		}
 	} catch (error) {
 		console.error(redactRcloneCredentials(String(error)));

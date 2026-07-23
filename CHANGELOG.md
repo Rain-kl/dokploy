@@ -4,6 +4,12 @@
 
 ---
 
+## [2026-07-23] - keepLatest 按任务保留 + 失败日志标明库名
+
+- **修改文件**：`packages/server/src/utils/backups/index.ts`, `packages/server/src/custom/backups/keep-latest-by-run.ts`, `append-backup-log.ts`, 各 `run*Backup`
+- **修改内容**：`keepLatestCount` 按共享 timestamp 的一次任务（run）保留，多库同次备份整组删除/保留；失败时 deployment log 写入失败库名
+- **上游侵入评估**：微小 (Low)
+
 ## [2026-07-23] - 二开 Migration 独立链 (drizzle-custom)
 
 - **修改文件**：`apps/dokploy/migration.ts`, `apps/dokploy/drizzle-custom/*`, `Dockerfile`, `Dockerfile.cloud`；移除主链 `drizzle/0175_*`

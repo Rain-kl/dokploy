@@ -1,3 +1,4 @@
+import { appendBackupLog } from "@dokploy/server/custom/backups/append-backup-log";
 import {
 	resolveBackupDatabases,
 	sanitizeBackupDbFilePart,
@@ -32,6 +33,7 @@ export const runMySqlBackup = async (mysql: MySql, backup: BackupSchedule) => {
 		throw new Error("No database names configured for backup");
 	}
 	const timestamp = getBackupTimestamp();
+	let currentDb = dbNames[0]!;
 	// CUSTOM-FEATURE: multi-database-backup END
 	const deployment = await createDeploymentBackup({
 		backupId: backup.backupId,
@@ -44,6 +46,7 @@ export const runMySqlBackup = async (mysql: MySql, backup: BackupSchedule) => {
 
 		// CUSTOM-FEATURE: multi-database-backup START
 		for (const dbName of dbNames) {
+			currentDb = dbName;
 			const backupFileName = `${sanitizeBackupDbFilePart(dbName)}-${timestamp}.sql.gz`;
 			const bucketDestination = `${appName}/${normalizeS3Path(prefix)}${backupFileName}`;
 			const rcloneDestination = `:s3:${destination.bucket}/${bucketDestination}`;
@@ -74,13 +77,21 @@ export const runMySqlBackup = async (mysql: MySql, backup: BackupSchedule) => {
 		await updateDeploymentStatus(deployment.deploymentId, "done");
 	} catch (error) {
 		console.log(error);
+		// CUSTOM-FEATURE: multi-database-backup
+		const errMsg =
+			// @ts-ignore
+			error?.message || "Error message not provided";
+		await appendBackupLog(
+			deployment.logPath,
+			`❌ Failed while backing up database: ${currentDb} — ${errMsg}`,
+			mysql.serverId,
+		);
 		await sendDatabaseBackupNotifications({
 			applicationName: name,
 			projectName: project.name,
 			databaseType: "mysql",
 			type: "error",
-			// @ts-ignore
-			errorMessage: error?.message || "Error message not provided",
+			errorMessage: errMsg,
 			organizationId: project.organizationId,
 			databaseName: dbNames.join(", "),
 		});
