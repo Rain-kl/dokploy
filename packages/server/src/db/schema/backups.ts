@@ -44,6 +44,9 @@ export const backups = pgTable("backup", {
 	schedule: text("schedule").notNull(),
 	enabled: boolean("enabled"),
 	database: text("database").notNull(),
+	// CUSTOM-FEATURE: multi-database-backup START
+	databases: jsonb("databases").$type<string[]>(),
+	// CUSTOM-FEATURE: multi-database-backup END
 	prefix: text("prefix").notNull(),
 	serviceName: text("serviceName"),
 	destinationId: text("destinationId")
@@ -145,6 +148,9 @@ const createSchema = createInsertSchema(backups, {
 	enabled: z.boolean().optional(),
 	prefix: z.string().min(1),
 	database: z.string().min(1),
+	// CUSTOM-FEATURE: multi-database-backup START
+	databases: z.array(z.string().min(1)).optional(),
+	// CUSTOM-FEATURE: multi-database-backup END
 	schedule: z.string(),
 	keepLatestCount: z.number().optional(),
 	databaseType: z.enum([
@@ -172,6 +178,9 @@ export const apiCreateBackup = createSchema.pick({
 	destinationId: true,
 	keepLatestCount: true,
 	database: true,
+	// CUSTOM-FEATURE: multi-database-backup START
+	databases: true,
+	// CUSTOM-FEATURE: multi-database-backup END
 	mariadbId: true,
 	mysqlId: true,
 	postgresId: true,
@@ -204,6 +213,9 @@ export const apiUpdateBackup = createSchema
 		backupId: true,
 		destinationId: true,
 		database: true,
+		// CUSTOM-FEATURE: multi-database-backup START
+		databases: true,
+		// CUSTOM-FEATURE: multi-database-backup END
 		keepLatestCount: true,
 		serviceName: true,
 		metadata: true,
@@ -212,6 +224,9 @@ export const apiUpdateBackup = createSchema
 	.required()
 	.extend({
 		includeEncryptionKey: z.boolean().optional(),
+		// CUSTOM-FEATURE: multi-database-backup START
+		databases: z.array(z.string().min(1)).optional(),
+		// CUSTOM-FEATURE: multi-database-backup END
 	});
 
 export const apiRestoreBackup = z.object({
