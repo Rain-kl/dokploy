@@ -4,10 +4,17 @@
 
 ---
 
+## [2026-07-23] - 二开 Migration 独立链 (drizzle-custom)
+
+- **修改文件**：`apps/dokploy/migration.ts`, `apps/dokploy/drizzle-custom/*`, `Dockerfile`, `Dockerfile.cloud`；移除主链 `drizzle/0175_*`
+- **修改内容**：二开 DDL 走 `drizzle-custom` + 表 `drizzle_migrations_custom`，与上游 `drizzle/` 序号隔离
+- **功能与背景**：避免 `git pull upstream` 时 migration idx/tag 必冲突
+- **上游侵入评估**：微小 (Low) — migration.ts 挂钩 + 镜像 COPY 一行
+
 ## [2026-07-23] - Multi-database backup selection
 
-- **修改文件**：`packages/server/src/db/schema/backups.ts`, `packages/server/src/custom/backups/*`, `packages/server/src/utils/backups/*`, `packages/server/src/services/backup.ts`, `apps/dokploy/server/api/routers/backup.ts`, `apps/dokploy/components/dashboard/database/backups/*`, drizzle migration
-- **修改内容**：Backup 支持 `databases[]` 多选；容器 listDatabases + 手填；每库独立 dump 文件名；兼容旧 `database` 字段
+- **修改文件**：`packages/server/src/db/schema/backups.ts`, `packages/server/src/custom/backups/*`, `packages/server/src/utils/backups/*`, `packages/server/src/services/backup.ts`, `apps/dokploy/server/api/routers/backup.ts`, `apps/dokploy/components/dashboard/database/backups/*`, `apps/dokploy/drizzle-custom/*`
+- **修改内容**：Backup 支持 `databases[]` 多选；容器 listDatabases + 手填；每库独立 dump 文件名；兼容旧 `database` 字段；DDL 进 custom migration 链
 - **功能与背景**：一条备份计划可覆盖同实例多个逻辑库
 - **上游侵入评估**：中等 (Medium) — schema/API/UI + 执行循环；list 逻辑在 custom/
 

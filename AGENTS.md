@@ -80,6 +80,13 @@
    ```
 4. **记录合并事件**：在 `CHANGELOG.md` 中记录本次同步上游版本号（如 `Sync with Upstream v0.9.x`）及冲突修复情况。
 
+### 3. 二开数据库 Migration（禁止占上游序号）
+* **主链**：`apps/dokploy/drizzle/` 仅跟随上游，禁止放入二开 SQL。
+* **二开链**：DDL 写入 `apps/dokploy/drizzle-custom/`（自有 `_journal.json`，序号从 `0000` 起）。
+* **运行**：`migration.ts` 先跑 `drizzle/`，再跑 `drizzle-custom/`（表名 `drizzle_migrations_custom`）。
+* **生成**：`pnpm run migration:generate` 若把二开列又生成进主链，**丢弃主链文件**，改为手写 SQL 追加到 `drizzle-custom/`。
+* **镜像**：`Dockerfile` / `Dockerfile.cloud` 需 `COPY drizzle-custom`。
+
 ---
 
 ## 📋 AI Agent 执行 Check List
