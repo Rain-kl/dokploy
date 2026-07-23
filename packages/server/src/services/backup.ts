@@ -1,3 +1,4 @@
+import { normalizeBackupDatabaseFields } from "@dokploy/server/custom/backups/resolve-databases";
 import { db } from "@dokploy/server/db";
 import { type apiCreateBackup, backups } from "@dokploy/server/db/schema";
 import { TRPCError } from "@trpc/server";
@@ -9,9 +10,15 @@ export type Backup = typeof backups.$inferSelect;
 export type BackupSchedule = Awaited<ReturnType<typeof findBackupById>>;
 export type BackupScheduleList = Awaited<ReturnType<typeof findBackupsByDbId>>;
 export const createBackup = async (input: z.infer<typeof apiCreateBackup>) => {
+	// CUSTOM-FEATURE: multi-database-backup START
+	const { database, databases } = normalizeBackupDatabaseFields({
+		database: input.database,
+		databases: input.databases as string[] | undefined,
+	});
+	// CUSTOM-FEATURE: multi-database-backup END
 	const newBackup = await db
 		.insert(backups)
-		.values({ ...input } as typeof backups.$inferInsert)
+		.values({ ...input, database, databases } as typeof backups.$inferInsert)
 		.returning()
 		.then((value) => value[0]);
 
@@ -56,10 +63,23 @@ export const updateBackupById = async (
 	backupId: string,
 	backupData: Partial<Backup>,
 ) => {
+	// CUSTOM-FEATURE: multi-database-backup START
+	let data = { ...backupData };
+	if (
+		backupData.database !== undefined ||
+		backupData.databases !== undefined
+	) {
+		const normalized = normalizeBackupDatabaseFields({
+			database: backupData.database,
+			databases: backupData.databases ?? undefined,
+		});
+		data = { ...data, ...normalized };
+	}
+	// CUSTOM-FEATURE: multi-database-backup END
 	const result = await db
 		.update(backups)
 		.set({
-			...backupData,
+			...data,
 		})
 		.where(eq(backups.backupId, backupId))
 		.returning();

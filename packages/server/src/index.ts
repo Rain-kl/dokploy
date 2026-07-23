@@ -1,6 +1,7 @@
 export * from "./auth/random-password";
 export * from "./constants/index";
 // CUSTOM-FEATURE: multi-database-backup START
+export * from "./custom/backups/list-databases";
 export * from "./custom/backups/resolve-databases";
 // CUSTOM-FEATURE: multi-database-backup END
 export * from "./db/constants";

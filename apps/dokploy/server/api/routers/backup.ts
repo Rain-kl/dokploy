@@ -17,6 +17,9 @@ import {
 	findServerById,
 	IS_CLOUD,
 	keepLatestNBackups,
+	// CUSTOM-FEATURE: multi-database-backup START
+	listDatabasesForService,
+	// CUSTOM-FEATURE: multi-database-backup END
 	removeBackupById,
 	removeScheduleBackup,
 	runLibsqlBackup,
@@ -469,6 +472,126 @@ export const backupRouter = createTRPCRouter({
 			});
 			return true;
 		}),
+	// CUSTOM-FEATURE: multi-database-backup START
+	listDatabases: protectedProcedure
+		.input(
+			z.object({
+				databaseType: z.enum(["postgres", "mysql", "mariadb", "mongo"]),
+				backupType: z.enum(["database", "compose"]).default("database"),
+				postgresId: z.string().optional(),
+				mysqlId: z.string().optional(),
+				mariadbId: z.string().optional(),
+				mongoId: z.string().optional(),
+				composeId: z.string().optional(),
+				serviceName: z.string().optional(),
+				metadata: z
+					.object({
+						postgres: z.object({ databaseUser: z.string() }).optional(),
+						mysql: z.object({ databaseRootPassword: z.string() }).optional(),
+						mariadb: z
+							.object({
+								databaseUser: z.string(),
+								databasePassword: z.string(),
+							})
+							.optional(),
+						mongo: z
+							.object({
+								databaseUser: z.string(),
+								databasePassword: z.string(),
+							})
+							.optional(),
+					})
+					.optional(),
+			}),
+		)
+		.query(async ({ input, ctx }) => {
+			const serviceId =
+				input.postgresId ||
+				input.mysqlId ||
+				input.mariadbId ||
+				input.mongoId ||
+				input.composeId;
+			if (serviceId) {
+				await checkServicePermissionAndAccess(ctx, serviceId, {
+					backup: ["read"],
+				});
+			}
+
+			if (input.backupType === "compose" && input.composeId) {
+				const compose = await findComposeById(input.composeId);
+				if (!input.serviceName) {
+					return {
+						databases: [] as string[],
+						warning: "Service name is required",
+					};
+				}
+				const meta = input.metadata;
+				return listDatabasesForService({
+					databaseType: input.databaseType,
+					appName: compose.appName,
+					serverId: compose.serverId,
+					backupType: "compose",
+					composeType: compose.composeType,
+					serviceName: input.serviceName,
+					databaseUser:
+						meta?.postgres?.databaseUser ||
+						meta?.mariadb?.databaseUser ||
+						meta?.mongo?.databaseUser,
+					databasePassword:
+						meta?.mariadb?.databasePassword || meta?.mongo?.databasePassword,
+					databaseRootPassword: meta?.mysql?.databaseRootPassword,
+				});
+			}
+
+			if (input.postgresId) {
+				const postgres = await findPostgresById(input.postgresId);
+				return listDatabasesForService({
+					databaseType: "postgres",
+					appName: postgres.appName,
+					serverId: postgres.serverId,
+					databaseUser: postgres.databaseUser,
+					backupType: "database",
+				});
+			}
+			if (input.mysqlId) {
+				const mysql = await findMySqlById(input.mysqlId);
+				return listDatabasesForService({
+					databaseType: "mysql",
+					appName: mysql.appName,
+					serverId: mysql.serverId,
+					databaseRootPassword: mysql.databaseRootPassword,
+					backupType: "database",
+				});
+			}
+			if (input.mariadbId) {
+				const mariadb = await findMariadbById(input.mariadbId);
+				return listDatabasesForService({
+					databaseType: "mariadb",
+					appName: mariadb.appName,
+					serverId: mariadb.serverId,
+					databaseUser: mariadb.databaseUser,
+					databasePassword: mariadb.databasePassword,
+					backupType: "database",
+				});
+			}
+			if (input.mongoId) {
+				const mongo = await findMongoById(input.mongoId);
+				return listDatabasesForService({
+					databaseType: "mongo",
+					appName: mongo.appName,
+					serverId: mongo.serverId,
+					databaseUser: mongo.databaseUser,
+					databasePassword: mongo.databasePassword,
+					backupType: "database",
+				});
+			}
+
+			return {
+				databases: [] as string[],
+				warning: "No database service specified",
+			};
+		}),
+	// CUSTOM-FEATURE: multi-database-backup END
 	listBackupFiles: withPermission("backup", "read")
 		.input(
 			z.object({

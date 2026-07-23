@@ -1,3 +1,7 @@
+import {
+	resolveBackupDatabases,
+	sanitizeBackupDbFilePart,
+} from "@dokploy/server/custom/backups/resolve-databases";
 import type { BackupSchedule } from "@dokploy/server/services/backup";
 import {
 	createDeploymentBackup,
@@ -22,8 +26,13 @@ export const runMongoBackup = async (mongo: Mongo, backup: BackupSchedule) => {
 	const project = await findProjectById(environment.projectId);
 	const { prefix } = backup;
 	const destination = await findDestinationById(backup.destinationId);
-	const backupFileName = `${getBackupTimestamp()}.bson.gz`;
-	const bucketDestination = `${appName}/${normalizeS3Path(prefix)}${backupFileName}`;
+	// CUSTOM-FEATURE: multi-database-backup START
+	const dbNames = resolveBackupDatabases(backup);
+	if (dbNames.length === 0) {
+		throw new Error("No database names configured for backup");
+	}
+	const timestamp = getBackupTimestamp();
+	// CUSTOM-FEATURE: multi-database-backup END
 	const deployment = await createDeploymentBackup({
 		backupId: backup.backupId,
 		title: "MongoDB Backup",
@@ -31,22 +40,28 @@ export const runMongoBackup = async (mongo: Mongo, backup: BackupSchedule) => {
 	});
 	try {
 		const rcloneFlags = getS3Credentials(destination);
-		const rcloneDestination = `:s3:${destination.bucket}/${bucketDestination}`;
-		const rcloneCommand = `rclone rcat ${rcloneFlags.join(" ")} "${rcloneDestination}"`;
 
-		const backupCommand = getBackupCommand(
-			backup,
-			rcloneCommand,
-			deployment.logPath,
-		);
-
-		if (mongo.serverId) {
-			await execAsyncRemote(mongo.serverId, backupCommand);
-		} else {
-			await execAsync(backupCommand, {
-				shell: "/bin/bash",
-			});
+		// CUSTOM-FEATURE: multi-database-backup START
+		for (const dbName of dbNames) {
+			const backupFileName = `${sanitizeBackupDbFilePart(dbName)}-${timestamp}.bson.gz`;
+			const bucketDestination = `${appName}/${normalizeS3Path(prefix)}${backupFileName}`;
+			const rcloneDestination = `:s3:${destination.bucket}/${bucketDestination}`;
+			const rcloneCommand = `rclone rcat ${rcloneFlags.join(" ")} "${rcloneDestination}"`;
+			const backupCommand = getBackupCommand(
+				backup,
+				rcloneCommand,
+				deployment.logPath,
+				dbName,
+			);
+			if (mongo.serverId) {
+				await execAsyncRemote(mongo.serverId, backupCommand);
+			} else {
+				await execAsync(backupCommand, {
+					shell: "/bin/bash",
+				});
+			}
 		}
+		// CUSTOM-FEATURE: multi-database-backup END
 
 		await sendDatabaseBackupNotifications({
 			applicationName: name,
@@ -54,7 +69,7 @@ export const runMongoBackup = async (mongo: Mongo, backup: BackupSchedule) => {
 			databaseType: "mongodb",
 			type: "success",
 			organizationId: project.organizationId,
-			databaseName: backup.database,
+			databaseName: dbNames.join(", "),
 		});
 		await updateDeploymentStatus(deployment.deploymentId, "done");
 	} catch (error) {
@@ -67,7 +82,7 @@ export const runMongoBackup = async (mongo: Mongo, backup: BackupSchedule) => {
 			// @ts-ignore
 			errorMessage: error?.message || "Error message not provided",
 			organizationId: project.organizationId,
-			databaseName: backup.database,
+			databaseName: dbNames.join(", "),
 		});
 		await updateDeploymentStatus(deployment.deploymentId, "error");
 		throw error;

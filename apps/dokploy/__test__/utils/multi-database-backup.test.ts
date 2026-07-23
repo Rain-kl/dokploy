@@ -49,4 +49,11 @@ describe("sanitizeBackupDbFilePart", () => {
 		expect(sanitizeBackupDbFilePart("my/db..name")).toBe("my_db_name");
 		expect(sanitizeBackupDbFilePart("ok-db_1")).toBe("ok-db_1");
 	});
+	test("filename pattern parts", () => {
+		const part = sanitizeBackupDbFilePart("app-db");
+		const ts = "2026-07-23T00-00-00-000Z";
+		expect(`${part}-${ts}.sql.gz`).toBe(
+			"app-db-2026-07-23T00-00-00-000Z.sql.gz",
+		);
+	});
 });

@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { AlertBlock } from "@/components/shared/alert-block";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
 	Command,
 	CommandEmpty,
@@ -63,6 +64,9 @@ import { cn } from "@/lib/utils";
 import { api } from "@/utils/api";
 import { ScheduleFormField } from "../../application/schedules/handle-schedules";
 
+// CUSTOM-FEATURE: multi-database-backup
+const MULTI_DB_TYPES = ["postgres", "mysql", "mariadb", "mongo"] as const;
+
 type CacheType = "cache" | "fetch";
 
 type DatabaseType =
@@ -80,7 +84,10 @@ const Schema = z
 		prefix: z.string().min(1, "Prefix required"),
 		enabled: z.boolean(),
 		includeEncryptionKey: z.boolean(),
-		database: z.string().min(1, "Database required"),
+		// CUSTOM-FEATURE: multi-database-backup START
+		database: z.string().optional(),
+		databases: z.array(z.string().min(1)).optional(),
+		// CUSTOM-FEATURE: multi-database-backup END
 		keepLatestCount: z.coerce.number().optional(),
 		serviceName: z.string().nullable(),
 		databaseType: z
@@ -115,6 +122,27 @@ const Schema = z
 			.optional(),
 	})
 	.superRefine((data, ctx) => {
+		// CUSTOM-FEATURE: multi-database-backup START
+		const dtype = data.databaseType;
+		if (dtype && (MULTI_DB_TYPES as readonly string[]).includes(dtype)) {
+			if (!data.databases?.length) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					message: "Select at least one database",
+					path: ["databases"],
+				});
+			}
+		} else if (dtype === "web-server" || dtype === "libsql") {
+			if (!data.database?.trim()) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					message: "Database required",
+					path: ["database"],
+				});
+			}
+		}
+		// CUSTOM-FEATURE: multi-database-backup END
+
 		if (data.backupType === "compose" && !data.databaseType) {
 			ctx.addIssue({
 				code: z.ZodIssueCode.custom,
@@ -198,6 +226,8 @@ export const HandleBackup = ({
 	backupType = "database",
 }: Props) => {
 	const [isOpen, setIsOpen] = useState(false);
+	// CUSTOM-FEATURE: multi-database-backup
+	const [manualDb, setManualDb] = useState("");
 
 	const { data, isPending } = api.destination.all.useQuery();
 	const { data: backup } = api.backup.one.useQuery(
@@ -222,6 +252,8 @@ export const HandleBackup = ({
 					: databaseType === "libsql"
 						? "iku.db"
 						: "",
+			// CUSTOM-FEATURE: multi-database-backup
+			databases: [] as string[],
 			destinationId: "",
 			enabled: true,
 			includeEncryptionKey: true,
@@ -253,6 +285,34 @@ export const HandleBackup = ({
 		},
 	);
 
+	// CUSTOM-FEATURE: multi-database-backup START
+	const watchedType = form.watch("databaseType") ?? databaseType;
+	const watchedService = form.watch("serviceName");
+	const watchedMetadata = form.watch("metadata");
+	const canList =
+		(MULTI_DB_TYPES as readonly string[]).includes(watchedType || "") &&
+		(backupType !== "compose" || !!watchedService);
+
+	const {
+		data: listed,
+		isFetching: isListing,
+		refetch: refetchDatabases,
+	} = api.backup.listDatabases.useQuery(
+		{
+			databaseType: watchedType as "postgres" | "mysql" | "mariadb" | "mongo",
+			backupType,
+			postgresId: databaseType === "postgres" ? id : undefined,
+			mysqlId: databaseType === "mysql" ? id : undefined,
+			mariadbId: databaseType === "mariadb" ? id : undefined,
+			mongoId: databaseType === "mongo" ? id : undefined,
+			composeId: backupType === "compose" ? id : undefined,
+			serviceName: watchedService || undefined,
+			metadata: watchedMetadata,
+		},
+		{ enabled: isOpen && canList && !!id, retry: false },
+	);
+	// CUSTOM-FEATURE: multi-database-backup END
+
 	useEffect(() => {
 		form.reset({
 			database: backup?.database
@@ -262,6 +322,13 @@ export const HandleBackup = ({
 					: databaseType === "libsql"
 						? "iku.db"
 						: "",
+			// CUSTOM-FEATURE: multi-database-backup START
+			databases: backup?.databases?.length
+				? backup.databases
+				: backup?.database
+					? [backup.database]
+					: [],
+			// CUSTOM-FEATURE: multi-database-backup END
 			destinationId: backup?.destinationId ?? "",
 			enabled: backup?.enabled ?? true,
 			includeEncryptionKey: backup?.includeEncryptionKey ?? true,
@@ -307,13 +374,22 @@ export const HandleBackup = ({
 											}
 										: undefined;
 
+		// CUSTOM-FEATURE: multi-database-backup START
+		const multi = (MULTI_DB_TYPES as readonly string[]).includes(
+			data.databaseType || databaseType || "",
+		);
+		// CUSTOM-FEATURE: multi-database-backup END
+
 		await createBackup({
 			destinationId: data.destinationId,
 			prefix: data.prefix,
 			schedule: data.schedule,
 			enabled: data.enabled,
 			includeEncryptionKey: data.includeEncryptionKey,
-			database: data.database,
+			// CUSTOM-FEATURE: multi-database-backup START
+			database: multi ? data.databases![0]! : data.database!,
+			databases: multi ? data.databases : data.database ? [data.database] : [],
+			// CUSTOM-FEATURE: multi-database-backup END
 			keepLatestCount: data.keepLatestCount ?? null,
 			databaseType: data.databaseType || databaseType,
 			serviceName: data.serviceName,
@@ -580,28 +656,151 @@ export const HandleBackup = ({
 									/>
 								</div>
 							)}
-							<FormField
-								control={form.control}
-								name="database"
-								render={({ field }) => {
-									return (
-										<FormItem>
-											<FormLabel>Database</FormLabel>
-											<FormControl>
-												<Input
-													disabled={
-														databaseType === "web-server" ||
-														databaseType === "libsql"
-													}
-													placeholder={"dokploy"}
-													{...field}
-												/>
-											</FormControl>
-											<FormMessage />
-										</FormItem>
-									);
-								}}
-							/>
+							{/* CUSTOM-FEATURE: multi-database-backup START */}
+							{(MULTI_DB_TYPES as readonly string[]).includes(
+								watchedType || "",
+							) ? (
+								<FormField
+									control={form.control}
+									name="databases"
+									render={({ field }) => {
+										const selected = field.value ?? [];
+										const options = [
+											...new Set([
+												...(listed?.databases ?? []),
+												...selected,
+											]),
+										];
+										const toggle = (name: string, on: boolean) => {
+											if (on) {
+												field.onChange(
+													selected.includes(name)
+														? selected
+														: [...selected, name],
+												);
+											} else {
+												field.onChange(selected.filter((n) => n !== name));
+											}
+										};
+										const addManual = () => {
+											const name = manualDb.trim();
+											if (!name) return;
+											if (!selected.includes(name)) {
+												field.onChange([...selected, name]);
+											}
+											setManualDb("");
+										};
+										return (
+											<FormItem>
+												<div className="flex items-center justify-between gap-2">
+													<FormLabel>Databases</FormLabel>
+													<Button
+														type="button"
+														variant="secondary"
+														size="sm"
+														isLoading={isListing}
+														onClick={() => refetchDatabases()}
+													>
+														<RefreshCw className="size-3.5" />
+													</Button>
+												</div>
+												{listed?.warning && (
+													<p className="text-xs text-muted-foreground">
+														{listed.warning}
+													</p>
+												)}
+												{selected.length > 0 && (
+													<div className="flex flex-wrap gap-1.5">
+														{selected.map((name) => (
+															<button
+																key={name}
+																type="button"
+																className="rounded-md border px-2 py-0.5 text-xs hover:bg-muted"
+																onClick={() => toggle(name, false)}
+															>
+																{name} ×
+															</button>
+														))}
+													</div>
+												)}
+												<ScrollArea className="h-32 rounded-md border p-2">
+													{options.length === 0 ? (
+														<p className="text-sm text-muted-foreground p-1">
+															No databases listed. Add manually below.
+														</p>
+													) : (
+														<div className="space-y-2">
+															{options.map((name) => (
+																<label
+																	key={name}
+																	className="flex items-center gap-2 text-sm cursor-pointer"
+																>
+																	<Checkbox
+																		checked={selected.includes(name)}
+																		onCheckedChange={(v) =>
+																			toggle(name, v === true)
+																		}
+																	/>
+																	{name}
+																</label>
+															))}
+														</div>
+													)}
+												</ScrollArea>
+												<div className="flex gap-2">
+													<Input
+														placeholder="Add database name"
+														value={manualDb}
+														onChange={(e) => setManualDb(e.target.value)}
+														onKeyDown={(e) => {
+															if (e.key === "Enter") {
+																e.preventDefault();
+																addManual();
+															}
+														}}
+													/>
+													<Button
+														type="button"
+														variant="secondary"
+														onClick={addManual}
+													>
+														Add
+													</Button>
+												</div>
+												<FormDescription>
+													Select one or more databases. Each is dumped to its
+													own backup file.
+												</FormDescription>
+												<FormMessage />
+											</FormItem>
+										);
+									}}
+								/>
+							) : (
+								<FormField
+									control={form.control}
+									name="database"
+									render={({ field }) => {
+										return (
+											<FormItem>
+												<FormLabel>Database</FormLabel>
+												<FormControl>
+													<Input
+														disabled={
+															databaseType === "web-server" ||
+															databaseType === "libsql"
+														}
+														placeholder={"dokploy"}
+														{...field}
+													/>
+												</FormControl>
+												<FormMessage />
+											</FormItem>
+										);
+									}}
+								/>
+							)}
+							{/* CUSTOM-FEATURE: multi-database-backup END */}
 
 							<ScheduleFormField name="schedule" formControl={form.control} />
 

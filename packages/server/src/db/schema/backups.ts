@@ -213,9 +213,6 @@ export const apiUpdateBackup = createSchema
 		backupId: true,
 		destinationId: true,
 		database: true,
-		// CUSTOM-FEATURE: multi-database-backup START
-		databases: true,
-		// CUSTOM-FEATURE: multi-database-backup END
 		keepLatestCount: true,
 		serviceName: true,
 		metadata: true,

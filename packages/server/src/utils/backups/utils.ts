@@ -176,17 +176,21 @@ const getContainerSearchCommand = (backup: BackupSchedule) => {
 	}
 };
 
-export const generateBackupCommand = (backup: BackupSchedule) => {
+// CUSTOM-FEATURE: multi-database-backup START
+export const generateBackupCommand = (
+	backup: BackupSchedule,
+	databaseName: string,
+) => {
 	const { backupType, databaseType } = backup;
 	switch (databaseType) {
 		case "postgres": {
 			const postgres = backup.postgres;
 			if (backupType === "database" && postgres) {
-				return getPostgresBackupCommand(backup.database, postgres.databaseUser);
+				return getPostgresBackupCommand(databaseName, postgres.databaseUser);
 			}
 			if (backupType === "compose" && backup.metadata?.postgres) {
 				return getPostgresBackupCommand(
-					backup.database,
+					databaseName,
 					backup.metadata.postgres.databaseUser,
 				);
 			}
@@ -196,13 +200,13 @@ export const generateBackupCommand = (backup: BackupSchedule) => {
 			const mysql = backup.mysql;
 			if (backupType === "database" && mysql) {
 				return getMysqlBackupCommand(
-					backup.database,
+					databaseName,
 					mysql.databaseRootPassword,
 				);
 			}
 			if (backupType === "compose" && backup.metadata?.mysql) {
 				return getMysqlBackupCommand(
-					backup.database,
+					databaseName,
 					backup.metadata?.mysql?.databaseRootPassword || "",
 				);
 			}
@@ -212,14 +216,14 @@ export const generateBackupCommand = (backup: BackupSchedule) => {
 			const mariadb = backup.mariadb;
 			if (backupType === "database" && mariadb) {
 				return getMariadbBackupCommand(
-					backup.database,
+					databaseName,
 					mariadb.databaseUser,
 					mariadb.databasePassword,
 				);
 			}
 			if (backupType === "compose" && backup.metadata?.mariadb) {
 				return getMariadbBackupCommand(
-					backup.database,
+					databaseName,
 					backup.metadata.mariadb.databaseUser,
 					backup.metadata.mariadb.databasePassword,
 				);
@@ -230,14 +234,14 @@ export const generateBackupCommand = (backup: BackupSchedule) => {
 			const mongo = backup.mongo;
 			if (backupType === "database" && mongo) {
 				return getMongoBackupCommand(
-					backup.database,
+					databaseName,
 					mongo.databaseUser,
 					mongo.databasePassword,
 				);
 			}
 			if (backupType === "compose" && backup.metadata?.mongo) {
 				return getMongoBackupCommand(
-					backup.database,
+					databaseName,
 					backup.metadata.mongo.databaseUser,
 					backup.metadata.mongo.databasePassword,
 				);
@@ -246,7 +250,7 @@ export const generateBackupCommand = (backup: BackupSchedule) => {
 		}
 		case "libsql": {
 			if (backupType === "database") {
-				return getLibsqlBackupCommand(backup.database);
+				return getLibsqlBackupCommand(databaseName);
 			}
 			break;
 		}
@@ -261,9 +265,12 @@ export const getBackupCommand = (
 	backup: BackupSchedule,
 	rcloneCommand: string,
 	logPath: string,
+	databaseName?: string,
 ) => {
 	const containerSearch = getContainerSearchCommand(backup);
-	const backupCommand = generateBackupCommand(backup);
+	const dbName = databaseName ?? backup.database;
+	const backupCommand = generateBackupCommand(backup, dbName);
+	// CUSTOM-FEATURE: multi-database-backup END
 
 	logger.info(
 		{

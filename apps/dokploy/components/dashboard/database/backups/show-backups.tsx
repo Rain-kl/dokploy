@@ -248,7 +248,10 @@ export const ShowBackups = ({
 																	Database
 																</span>
 																<p className="font-medium text-sm mt-0.5">
-																	{backup.database}
+																	{/* CUSTOM-FEATURE: multi-database-backup */}
+																	{backup.databases?.length
+																		? backup.databases.join(", ")
+																		: backup.database}
 																</p>
 															</div>
 

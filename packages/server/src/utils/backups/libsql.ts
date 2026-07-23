@@ -39,10 +39,12 @@ export const runLibsqlBackup = async (
 
 		const rcloneCommand = `rclone rcat ${rcloneFlags.join(" ")} "${rcloneDestination}"`;
 
+		// CUSTOM-FEATURE: multi-database-backup — single DB via optional name
 		const backupCommand = getBackupCommand(
 			backup,
 			rcloneCommand,
 			deployment.logPath,
+			backup.database,
 		);
 		if (libsql.serverId) {
 			await execAsyncRemote(libsql.serverId, backupCommand);

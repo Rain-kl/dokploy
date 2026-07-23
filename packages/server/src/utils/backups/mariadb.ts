@@ -1,3 +1,7 @@
+import {
+	resolveBackupDatabases,
+	sanitizeBackupDbFilePart,
+} from "@dokploy/server/custom/backups/resolve-databases";
 import type { BackupSchedule } from "@dokploy/server/services/backup";
 import {
 	createDeploymentBackup,
@@ -25,38 +29,50 @@ export const runMariadbBackup = async (
 	const project = await findProjectById(environment.projectId);
 	const { prefix } = backup;
 	const destination = await findDestinationById(backup.destinationId);
-	const backupFileName = `${getBackupTimestamp()}.sql.gz`;
-	const bucketDestination = `${appName}/${normalizeS3Path(prefix)}${backupFileName}`;
+	// CUSTOM-FEATURE: multi-database-backup START
+	const dbNames = resolveBackupDatabases(backup);
+	if (dbNames.length === 0) {
+		throw new Error("No database names configured for backup");
+	}
+	const timestamp = getBackupTimestamp();
+	// CUSTOM-FEATURE: multi-database-backup END
 	const deployment = await createDeploymentBackup({
 		backupId: backup.backupId,
 		title: "MariaDB Backup",
 		description: "MariaDB Backup",
 	});
+
 	try {
 		const rcloneFlags = getS3Credentials(destination);
-		const rcloneDestination = `:s3:${destination.bucket}/${bucketDestination}`;
-		const rcloneCommand = `rclone rcat ${rcloneFlags.join(" ")} "${rcloneDestination}"`;
 
-		const backupCommand = getBackupCommand(
-			backup,
-			rcloneCommand,
-			deployment.logPath,
-		);
-		if (mariadb.serverId) {
-			await execAsyncRemote(mariadb.serverId, backupCommand);
-		} else {
-			await execAsync(backupCommand, {
-				shell: "/bin/bash",
-			});
+		// CUSTOM-FEATURE: multi-database-backup START
+		for (const dbName of dbNames) {
+			const backupFileName = `${sanitizeBackupDbFilePart(dbName)}-${timestamp}.sql.gz`;
+			const bucketDestination = `${appName}/${normalizeS3Path(prefix)}${backupFileName}`;
+			const rcloneDestination = `:s3:${destination.bucket}/${bucketDestination}`;
+			const rcloneCommand = `rclone rcat ${rcloneFlags.join(" ")} "${rcloneDestination}"`;
+			const backupCommand = getBackupCommand(
+				backup,
+				rcloneCommand,
+				deployment.logPath,
+				dbName,
+			);
+			if (mariadb.serverId) {
+				await execAsyncRemote(mariadb.serverId, backupCommand);
+			} else {
+				await execAsync(backupCommand, {
+					shell: "/bin/bash",
+				});
+			}
 		}
-
+		// CUSTOM-FEATURE: multi-database-backup END
 		await sendDatabaseBackupNotifications({
 			applicationName: name,
 			projectName: project.name,
 			databaseType: "mariadb",
 			type: "success",
 			organizationId: project.organizationId,
-			databaseName: backup.database,
+			databaseName: dbNames.join(", "),
 		});
 		await updateDeploymentStatus(deployment.deploymentId, "done");
 	} catch (error) {
@@ -69,7 +85,7 @@ export const runMariadbBackup = async (
 			// @ts-ignore
 			errorMessage: error?.message || "Error message not provided",
 			organizationId: project.organizationId,
-			databaseName: backup.database,
+			databaseName: dbNames.join(", "),
 		});
 		await updateDeploymentStatus(deployment.deploymentId, "error");
 		throw error;
