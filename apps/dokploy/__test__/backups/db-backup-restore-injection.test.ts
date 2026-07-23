@@ -73,7 +73,8 @@ describe("database backup/restore command injection", () => {
 	const cases: Array<[string, (v: string) => string]> = [
 		["postgres backup (database)", (v) => getPostgresBackupCommand(v, "u")],
 		["postgres backup (user)", (v) => getPostgresBackupCommand("db", v)],
-		["mariadb backup (password)", (v) => getMariadbBackupCommand("db", "u", v)],
+		// CUSTOM-FEATURE: multi-database-backup — mariadb dump uses root password only
+		["mariadb backup (password)", (v) => getMariadbBackupCommand("db", v)],
 		["mysql backup (database)", (v) => getMysqlBackupCommand(v, "pw")],
 		["mongo backup (user)", (v) => getMongoBackupCommand("db", v, "pw")],
 		["libsql backup (database)", (v) => getLibsqlBackupCommand(v)],

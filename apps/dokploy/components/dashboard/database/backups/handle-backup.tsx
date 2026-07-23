@@ -185,6 +185,14 @@ const Schema = z
 						path: ["metadata", "mariadb", "databasePassword"],
 					});
 				}
+				// CUSTOM-FEATURE: multi-database-backup — dump/list need root
+				if (!data.metadata?.mariadb?.databaseRootPassword) {
+					ctx.addIssue({
+						code: z.ZodIssueCode.custom,
+						message: "Root password is required for MariaDB backups",
+						path: ["metadata", "mariadb", "databaseRootPassword"],
+					});
+				}
 			} else if (data.databaseType === "mongo") {
 				if (!data.metadata?.mongo?.databaseUser) {
 					ctx.addIssue({
@@ -960,8 +968,9 @@ export const HandleBackup = ({
 															/>
 														</FormControl>
 														<FormDescription>
-															Used to list all databases (SHOW DATABASES as
-															root). Backup dump still uses the user above.
+															Required for listing and dumping all databases
+															(root). App user only has access to the default
+															DB.
 														</FormDescription>
 														<FormMessage />
 													</FormItem>

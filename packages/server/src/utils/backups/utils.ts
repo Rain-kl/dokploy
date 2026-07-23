@@ -103,12 +103,12 @@ export const getPostgresBackupCommand = (
 	return `docker exec -e DB_NAME=${quote([database])} -e DB_USER=${quote([databaseUser])} -i $CONTAINER_ID bash -c 'set -o pipefail; pg_dump -Fc --no-acl --no-owner -h localhost -U "$DB_USER" --no-password "$DB_NAME" | gzip'`;
 };
 
+// CUSTOM-FEATURE: multi-database-backup — dump as root (app user only has default DB grants)
 export const getMariadbBackupCommand = (
 	database: string,
-	databaseUser: string,
-	databasePassword: string,
+	databaseRootPassword: string,
 ) => {
-	return `docker exec -e DB_NAME=${quote([database])} -e DB_USER=${quote([databaseUser])} -e DB_PASS=${quote([databasePassword])} -i $CONTAINER_ID bash -c 'set -o pipefail; mariadb-dump --user="$DB_USER" --password="$DB_PASS" --single-transaction --quick --databases "$DB_NAME" | gzip'`;
+	return `docker exec -e DB_NAME=${quote([database])} -e DB_PASS=${quote([databaseRootPassword])} -i $CONTAINER_ID bash -c 'set -o pipefail; mariadb-dump --user=root --password="$DB_PASS" --single-transaction --quick --databases "$DB_NAME" | gzip'`;
 };
 
 export const getMysqlBackupCommand = (
@@ -217,16 +217,16 @@ export const generateBackupCommand = (
 			if (backupType === "database" && mariadb) {
 				return getMariadbBackupCommand(
 					databaseName,
-					mariadb.databaseUser,
-					mariadb.databasePassword,
+					mariadb.databaseRootPassword,
 				);
 			}
 			if (backupType === "compose" && backup.metadata?.mariadb) {
-				return getMariadbBackupCommand(
-					databaseName,
-					backup.metadata.mariadb.databaseUser,
-					backup.metadata.mariadb.databasePassword,
-				);
+				// Prefer root password; fall back only for legacy metadata
+				const rootPass =
+					backup.metadata.mariadb.databaseRootPassword ||
+					backup.metadata.mariadb.databasePassword ||
+					"";
+				return getMariadbBackupCommand(databaseName, rootPass);
 			}
 			break;
 		}
