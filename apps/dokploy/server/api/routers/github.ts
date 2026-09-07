@@ -1,5 +1,6 @@
 import {
 	assertGitProviderAccess,
+	canViewGitProviderSecrets,
 	findGithubById,
 	getAccessibleGitProviderIds,
 	getGithubBranches,
@@ -28,6 +29,16 @@ export const githubRouter = createTRPCRouter({
 		.query(async ({ input, ctx }) => {
 			const github = await findGithubById(input.githubId);
 			await assertGitProviderAccess(ctx.session, github.gitProvider);
+
+			if (!(await canViewGitProviderSecrets(ctx.session, github.gitProvider))) {
+				return {
+					...github,
+					githubClientSecret: null,
+					githubPrivateKey: null,
+					githubWebhookSecret: null,
+				};
+			}
+
 			return github;
 		}),
 	getGithubRepositories: protectedProcedure
@@ -67,6 +78,7 @@ export const githubRouter = createTRPCRouter({
 			.map((provider) => {
 				return {
 					githubId: provider.githubId,
+					githubUrl: provider.githubUrl,
 					gitProvider: {
 						...provider.gitProvider,
 					},

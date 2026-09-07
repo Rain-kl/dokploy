@@ -42,17 +42,16 @@ export const runMongoBackup = async (mongo: Mongo, backup: BackupSchedule) => {
 	});
 	try {
 		const rcloneFlags = getS3Credentials(destination);
-
 		// CUSTOM-FEATURE: multi-database-backup START
 		for (const dbName of dbNames) {
 			currentDb = dbName;
 			const backupFileName = `${sanitizeBackupDbFilePart(dbName)}-${timestamp}.bson.gz`;
 			const bucketDestination = `${appName}/${normalizeS3Path(prefix)}${backupFileName}`;
 			const rcloneDestination = `:s3:${destination.bucket}/${bucketDestination}`;
-			const rcloneCommand = `rclone rcat ${rcloneFlags.join(" ")} "${rcloneDestination}"`;
 			const backupCommand = getBackupCommand(
 				backup,
-				rcloneCommand,
+				rcloneFlags,
+				rcloneDestination,
 				deployment.logPath,
 				dbName,
 			);

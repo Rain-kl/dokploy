@@ -65,10 +65,7 @@ export const updateBackupById = async (
 ) => {
 	// CUSTOM-FEATURE: multi-database-backup START
 	let data = { ...backupData };
-	if (
-		backupData.database !== undefined ||
-		backupData.databases !== undefined
-	) {
+	if (backupData.database !== undefined || backupData.databases !== undefined) {
 		// Prefer explicit databases list; empty array falls back via resolve helpers
 		const normalized = normalizeBackupDatabaseFields({
 			database: backupData.database,

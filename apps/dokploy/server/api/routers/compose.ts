@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import {
 	addDomainToCompose,
 	clearOldDeployments,
@@ -37,6 +38,7 @@ import {
 	updateCompose,
 	updateDeploymentStatus,
 } from "@dokploy/server";
+import { paths } from "@dokploy/server/constants";
 import { db } from "@dokploy/server/db";
 import { canEditDeployGitSource } from "@dokploy/server/services/git-provider";
 import {
@@ -48,6 +50,7 @@ import {
 import {
 	type CompleteTemplate,
 	fetchTemplateFiles,
+	fetchTemplateLogo,
 	fetchTemplatesList,
 } from "@dokploy/server/templates/github";
 import { processTemplate } from "@dokploy/server/templates/processors";
@@ -219,6 +222,7 @@ export const composeRouter = createTRPCRouter({
 			});
 			const updated = await updateCompose(input.composeId, {
 				env: input.env,
+				createEnvFile: input.createEnvFile,
 			});
 
 			if (!updated) {
@@ -432,6 +436,7 @@ export const composeRouter = createTRPCRouter({
 				descriptionLog: input.description || "",
 				server: !!compose.serverId,
 				serverId: compose.serverId ?? undefined,
+				freshVolumes: input.freshVolumes,
 			};
 
 			if (IS_CLOUD && compose.serverId) {
@@ -481,6 +486,7 @@ export const composeRouter = createTRPCRouter({
 				descriptionLog: input.description || "",
 				server: !!compose.serverId,
 				serverId: compose.serverId ?? undefined,
+				freshVolumes: input.freshVolumes,
 			};
 			if (IS_CLOUD && compose.serverId) {
 				deploy(jobData).catch((error) => {
@@ -596,7 +602,12 @@ export const composeRouter = createTRPCRouter({
 				service: ["create"],
 			});
 			const compose = await findComposeById(input.composeId);
-			const command = createCommand(compose);
+			const { COMPOSE_PATH } = paths(!!compose.serverId);
+			const projectPath = join(COMPOSE_PATH, compose.appName, "code");
+			const command = createCommand(
+				compose,
+				compose.mounts.length > 0 ? projectPath : undefined,
+			);
 			return `docker ${command}`;
 		}),
 	refreshToken: protectedProcedure
@@ -652,7 +663,10 @@ export const composeRouter = createTRPCRouter({
 				}
 			}
 
-			const template = await fetchTemplateFiles(input.id, input.baseUrl);
+			const [template, templateLogo] = await Promise.all([
+				fetchTemplateFiles(input.id, input.baseUrl),
+				fetchTemplateLogo(input.id, input.baseUrl),
+			]);
 
 			let serverIp = "127.0.0.1";
 
@@ -690,7 +704,7 @@ export const composeRouter = createTRPCRouter({
 				name: input.id,
 				sourceType: "raw",
 				appName: appName,
-				isolatedDeployment: template.config.config?.isolated !== false,
+				icon: templateLogo,
 			});
 
 			await addNewService(ctx, compose.composeId);
@@ -1048,7 +1062,6 @@ export const composeRouter = createTRPCRouter({
 					composeFile: templateData.compose,
 					sourceType: "raw",
 					env: processedTemplate.envs?.join("\n"),
-					isolatedDeployment: true,
 				});
 
 				if (processedTemplate.mounts && processedTemplate.mounts.length > 0) {

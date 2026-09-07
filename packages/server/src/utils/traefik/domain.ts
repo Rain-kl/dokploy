@@ -23,6 +23,15 @@ export const manageDomain = async (app: ApplicationNested, domain: Domain) => {
 	if (!ENABLE_TRAEFIK) return;
 	// CUSTOM-FEATURE: [Traefik 解耦] END
 	const { appName } = app;
+
+	// A disabled domain keeps its configuration in the database but must never
+	// expose a traefik router. Guarding here covers every caller (create, update,
+	// forward-auth, toggle) so a disabled domain can't be revived from any path.
+	if (!domain.enabled) {
+		await removeDomain(app, domain.uniqueConfigKey);
+		return;
+	}
+
 	let config: FileConfig;
 
 	if (app.serverId) {

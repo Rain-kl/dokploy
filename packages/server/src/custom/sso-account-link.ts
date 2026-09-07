@@ -427,7 +427,8 @@ export async function tryHandleSsoAccountLinkCallback(
 
 		const tokens = await validateAuthorizationCode({
 			code,
-			codeVerifier: config.pkce === false ? undefined : link.payload.codeVerifier,
+			codeVerifier:
+				config.pkce === false ? undefined : link.payload.codeVerifier,
 			redirectURI: link.payload.redirectUri,
 			options: {
 				clientId: config.clientId,
@@ -461,9 +462,7 @@ export async function tryHandleSsoAccountLinkCallback(
 		return true;
 	} catch (error) {
 		console.error("[sso-account-link] failed:", error);
-		failRedirect(
-			error instanceof Error ? error.message : "sso_link_failed",
-		);
+		failRedirect(error instanceof Error ? error.message : "sso_link_failed");
 		return true;
 	}
 }

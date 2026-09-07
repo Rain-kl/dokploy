@@ -1,13 +1,13 @@
 {
-  "version": "7",
-  "dialect": "pg",
-  "entries": [
-    {
-      "idx": 0,
-      "version": "7",
-      "when": 1784809525028,
-      "tag": "0000_multi_database_backup",
-      "breakpoints": true
-    }
-  ]
+	"version": "7",
+	"dialect": "pg",
+	"entries": [
+		{
+			"idx": 0,
+			"version": "7",
+			"when": 1784809525028,
+			"tag": "0000_multi_database_backup",
+			"breakpoints": true
+		}
+	]
 }

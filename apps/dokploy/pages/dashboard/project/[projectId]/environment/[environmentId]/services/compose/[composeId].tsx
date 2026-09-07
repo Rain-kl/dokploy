@@ -2,7 +2,7 @@ import { ENABLE_TRAEFIK } from "@dokploy/server/constants/env";
 import { validateRequest } from "@dokploy/server/lib/auth";
 import { createServerSideHelpers } from "@trpc/react-query/server";
 import copy from "copy-to-clipboard";
-import { CircuitBoard, HelpCircle, ServerOff } from "lucide-react";
+import { HelpCircle, ServerOff } from "lucide-react";
 import type {
 	GetServerSidePropsContext,
 	InferGetServerSidePropsType,
@@ -18,6 +18,7 @@ import { ShowVolumes } from "@/components/dashboard/application/advanced/volumes
 import { ShowDeployments } from "@/components/dashboard/application/deployments/show-deployments";
 import { ShowDomains } from "@/components/dashboard/application/domains/show-domains";
 import { ShowEnvironment } from "@/components/dashboard/application/environment/show-environment";
+import { ShowIconSettings } from "@/components/dashboard/application/icon/show-icon-settings";
 import { ShowPatches } from "@/components/dashboard/application/patches/show-patches";
 import { ShowSchedules } from "@/components/dashboard/application/schedules/show-schedules";
 import { ShowVolumeBackups } from "@/components/dashboard/application/volume-backups/show-volume-backups";
@@ -32,6 +33,7 @@ import { UpdateCompose } from "@/components/dashboard/compose/update-compose";
 import { ShowBackups } from "@/components/dashboard/database/backups/show-backups";
 import { ComposeFreeMonitoring } from "@/components/dashboard/monitoring/free/container/show-free-compose-monitoring";
 import { ComposePaidMonitoring } from "@/components/dashboard/monitoring/paid/container/show-paid-compose-monitoring";
+import { AssignComposeNetworks } from "@/components/dashboard/networks/assign-compose-networks";
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { AdvanceBreadcrumb } from "@/components/shared/advance-breadcrumb";
 import { StatusTooltip } from "@/components/shared/status-tooltip";
@@ -113,13 +115,16 @@ const Service = (
 						<div className="flex flex-col gap-4">
 							<CardHeader className="flex flex-row justify-between items-center">
 								<div className="flex flex-col">
-									<CardTitle className="text-xl flex flex-row gap-2">
-										<div className="relative flex flex-row gap-4">
-											<div className="absolute -right-1 -top-2">
+									<CardTitle className="text-xl flex flex-row gap-2 items-center">
+										<div className="relative flex flex-row gap-4 items-center">
+											<ShowIconSettings
+												serviceId={composeId}
+												serviceType="compose"
+												icon={data?.icon}
+											/>
+											<div className="absolute -right-1 -top-2 z-10">
 												<StatusTooltip status={data?.composeStatus} />
 											</div>
-
-											<CircuitBoard className="h-6 w-6 text-muted-foreground" />
 										</div>
 										{data?.name}
 									</CardTitle>
@@ -428,6 +433,7 @@ const Service = (
 												<AddCommandCompose composeId={composeId} />
 												<ShowVolumes id={composeId} type="compose" />
 												<ShowImport composeId={composeId} />
+												<AssignComposeNetworks composeId={composeId} />
 												<IsolatedDeploymentTab composeId={composeId} />
 											</div>
 										</TabsContent>

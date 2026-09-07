@@ -196,7 +196,8 @@ export function LinkingAccount() {
 								<Loader2 className="size-4 animate-spin" />
 								Loading...
 							</div>
-						) : socialAccounts.length === 0 && linkedSsoAccounts.length === 0 ? (
+						) : socialAccounts.length === 0 &&
+							linkedSsoAccounts.length === 0 ? (
 							<p className="text-sm text-muted-foreground py-2">
 								No accounts linked yet.
 							</p>

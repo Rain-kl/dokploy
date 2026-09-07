@@ -37,12 +37,10 @@ export const runLibsqlBackup = async (
 		const rcloneFlags = getS3Credentials(destination);
 		const rcloneDestination = `:s3:${destination.bucket}/${bucketDestination}`;
 
-		const rcloneCommand = `rclone rcat ${rcloneFlags.join(" ")} "${rcloneDestination}"`;
-
-		// CUSTOM-FEATURE: multi-database-backup — single DB via optional name
 		const backupCommand = getBackupCommand(
 			backup,
-			rcloneCommand,
+			rcloneFlags,
+			rcloneDestination,
 			deployment.logPath,
 			backup.database,
 		);

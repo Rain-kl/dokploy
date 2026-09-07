@@ -676,10 +676,7 @@ export const HandleBackup = ({
 									render={({ field }) => {
 										const selected = field.value ?? [];
 										const options = [
-											...new Set([
-												...(listed?.databases ?? []),
-												...selected,
-											]),
+											...new Set([...(listed?.databases ?? []), ...selected]),
 										];
 										const toggle = (name: string, on: boolean) => {
 											if (on) {

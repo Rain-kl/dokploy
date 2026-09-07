@@ -2,7 +2,19 @@
 
 仅记录具备实质价值的代码二次开发（核心功能、架构调整、合并冲突等）。
 
----
+## [2026-09-07] - Sync with Upstream v0.30.5
+
+- **修改文件**：`.github/workflows/dokploy.yml`, `apps/dokploy/setup.ts`, `apps/dokploy/components/dashboard/compose/general/actions.tsx`, `apps/dokploy/pages/dashboard/project/[projectId]/environment/[environmentId]/services/application/[applicationId].tsx`, `packages/server/src/services/proprietary/license-key.ts`, `packages/server/src/setup/redis-setup.ts`, `packages/server/src/utils/backups/*`, `packages/server/src/utils/docker/domain.ts`
+- **修改内容**：
+  1. 同步上游 `upstream/canary` 至最新（版本 `v0.30.5`，合入 600 个 upstream commits）。
+  2. 冲突合并以本地二次开发为准：完整保留多库备份、Traefik 解耦、企业版免 License 全开、Compose 重启/Down 等二开逻辑。
+  3. 冲突修复：
+     - `redis-setup.ts`：接受上游移除废弃内部 Redis 基础设施（上游部署队列已转为 InMemoryQueue）。
+     - `license-key.ts`：保留自托管免 License 恒通过，同时集成上游新增的 `resolveOrganizationDefaultRole` 自定义角色逻辑。
+     - `backups/*`：保留多库循环备份，适配上游新增的 `getBackupCommand` 签名及 S3 失败自动清理机制。
+     - `actions.tsx` / `applicationId.tsx` / `setup.ts` / `domain.ts`：适配上游 Deploy with Fresh Volumes 与 Network 管理，保留二开按钮与 `ENABLE_TRAEFIK` 条件逻辑。
+  4. 数据库 Migration：得益于 `drizzle-custom` 独立链隔离设计，上游 17 个新 Migration (`0175` - `0191`) 零冲突平滑合入。
+- **上游侵入评估**：微小 (Low) - 冲突均在二开锚点处平滑收敛，通过全量 `typecheck` 与 `build`。
 
 ## [2026-07-23] - keepLatest 按任务保留 + 失败日志标明库名
 

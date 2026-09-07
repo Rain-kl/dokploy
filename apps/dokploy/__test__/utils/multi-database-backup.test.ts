@@ -17,9 +17,7 @@ describe("resolveBackupDatabases", () => {
 		).toEqual(["x", "y"]);
 	});
 	test("falls back to legacy database", () => {
-		expect(resolveBackupDatabases({ database: "legacy" })).toEqual([
-			"legacy",
-		]);
+		expect(resolveBackupDatabases({ database: "legacy" })).toEqual(["legacy"]);
 	});
 	test("trims and drops empties", () => {
 		expect(resolveBackupDatabases({ databases: [" a ", "", "b"] })).toEqual([
@@ -79,9 +77,9 @@ describe("parseListedDatabases", () => {
 		).toEqual(["app", "foo"]);
 	});
 	test("filters mongo system dbs", () => {
-		expect(
-			parseListedDatabases("mongo", "admin\nlocal\nconfig\napp"),
-		).toEqual(["app"]);
+		expect(parseListedDatabases("mongo", "admin\nlocal\nconfig\napp")).toEqual([
+			"app",
+		]);
 	});
 	test("keeps postgres names", () => {
 		expect(parseListedDatabases("postgres", "dokploy\napp")).toEqual([
