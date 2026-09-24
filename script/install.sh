@@ -113,7 +113,7 @@ install_dokploy() {
     chmod 600 /etc/dokploy/auth_secret 2>/dev/null || true
 
     # 启动 Valkey 8 Alpine 容器服务
-    if ! docker service ls | grep -q "dokploy-redis"; then
+    if ! docker service inspect dokploy-redis >/dev/null 2>&1; then
         echo "启动 dokploy-redis (Valkey 8 Alpine) 服务..."
         docker service create \
             --name dokploy-redis \
@@ -124,7 +124,7 @@ install_dokploy() {
     fi
 
     # 启动 Postgres 16 Alpine 容器服务
-    if ! docker service ls | grep -q "dokploy-postgres"; then
+    if ! docker service inspect dokploy-postgres >/dev/null 2>&1; then
         echo "启动 dokploy-postgres (Postgres 16 Alpine) 服务..."
         docker service create \
             --name dokploy-postgres \
@@ -134,7 +134,6 @@ install_dokploy() {
             --env POSTGRES_DB=dokploy \
             --secret source=dokploy_postgres_password,target=/run/secrets/postgres_password \
             --env POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password \
-            --env POSTGRES_PASSWORD=amukds4wi9001583845717ad2 \
             --mount type=volume,source=dokploy-postgres,target=/var/lib/postgresql/data \
             postgres:16-alpine || true
     fi
@@ -143,7 +142,7 @@ install_dokploy() {
     echo "拉取最新 Dokploy 镜像 (${DOCKER_IMAGE})..."
     docker pull "${DOCKER_IMAGE}"
 
-    if docker service ls | grep -q "dokploy"; then
+    if docker service inspect dokploy >/dev/null 2>&1; then
         echo "更新已有 Dokploy 服务镜像..."
         IMAGE_DIGEST=$(docker image inspect --format='{{index .RepoDigests 0}}' "${DOCKER_IMAGE}" 2>/dev/null || true)
         if [ -n "$IMAGE_DIGEST" ]; then
